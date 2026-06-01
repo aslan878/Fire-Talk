@@ -1,0 +1,89 @@
+:root {
+  --bg-darker: #111318;
+  --bg-dark: #171a20;
+  --bg-panel: #20242c;
+  --bg-hover: #2a303a;
+  --primary: #65758f;
+  --primary-hover: #8a98ad;
+  --text-main: #eef2f7;
+  --text-muted: #9aa6b6;
+  --border: #2e2e38;
+  --green: #4f9a73;
+
+
+  --icon-color: var(--text-muted);
+  --icon-hover-color: var(--text-main);
+  --menu-icon-color: var(--primary);
+  --menu-icon-hover-color: #ffffff;
+
+  --popup-bg: rgba(24, 27, 33, 0.92);
+  --popup-border: rgba(255, 255, 255, 0.08);
+  --popup-shadow: 0 14px 34px rgba(0, 0, 0, 0.38);
+  --popup-blur: 10px;
+
+  --popup-item-color: var(--text-muted);
+  --popup-item-hover-bg: rgba(255, 255, 255, 0.07);
+  --popup-item-hover-color: #ffffff;
+}
+
+body.light-theme {
+  --bg-darker: #eef1f4;
+  --bg-dark: #f7f8fa;
+  --bg-panel: #e8ebef;
+  --bg-hover: #dde3ea;
+  --primary: #5f6878;
+  --primary-hover: #465163;
+  --text-main: #0f172a;
+  --text-muted: #536274;
+  --border: #e2e8f0;
+  --green: #3d8b63;
+
+  --icon-color: var(--text-muted);
+  --icon-hover-color: var(--text-main);
+  --menu-icon-color: var(--primary);
+  --menu-icon-hover-color: #ffffff;
+
+  --popup-bg: rgba(255, 255, 255, 0.076);
+  --popup-border: rgba(15, 23, 42, 0.08);
+  --popup-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
+  --popup-blur: 5px;
+
+  --popup-item-color: var(--text-muted);
+  --popup-item-hover-bg: var(--primary);
+  --popup-item-hover-color: #ffffff;
+}
+
+body {
+  margin: 0;
+
+  padding: 0;
+  background-color: var(--bg-darker);
+  color: var(--text-main);
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  overflow: hidden;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-hover);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f50;
+}

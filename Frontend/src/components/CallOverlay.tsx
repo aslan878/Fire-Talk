@@ -1,0 +1,213 @@
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faMicrophone,
+  faMicrophoneSlash,
+  faPhone,
+  faPhoneSlash,
+  faVideo,
+  faVideoSlash,
+} from "@fortawesome/free-solid-svg-icons";
+import type { CallState, CallPeer, CallType } from "../hooks/useCall";
+import { formatCallDuration } from "../hooks/useCall";
+
+interface CallOverlayProps {
+  callState: CallState;
+  peer: CallPeer | null;
+  callType: CallType;
+  callDuration: number;
+  isMuted: boolean;
+  isVideoEnabled: boolean;
+  callError: string | null;
+  remoteAudioRef: React.RefObject<HTMLAudioElement | null>;
+  remoteVideoRef: React.RefObject<HTMLVideoElement | null>;
+  localVideoRef: React.RefObject<HTMLVideoElement | null>;
+  onAccept: () => void;
+  onReject: () => void;
+  onEnd: () => void;
+  onToggleMute: () => void;
+  onToggleVideo: () => void;
+  onClearError: () => void;
+}
+
+export function CallOverlay({
+  callState,
+  peer,
+  callType,
+  callDuration,
+  isMuted,
+  isVideoEnabled,
+  callError,
+  remoteAudioRef,
+  remoteVideoRef,
+  localVideoRef,
+  onAccept,
+  onReject,
+  onEnd,
+  onToggleMute,
+  onToggleVideo,
+  onClearError,
+}: CallOverlayProps) {
+  if (callState === "idle" && !callError) return null;
+
+  const typeText = callType === "video" ? "Видео" : "Аудио";
+  const statusText =
+    callState === "outgoing"
+      ? `${typeText}вызов...`
+      : callState === "incoming"
+        ? `Входящий ${typeText.toLowerCase()}звонок`
+        : callState === "connecting"
+          ? "Подключение..."
+          : callState === "connected"
+            ? formatCallDuration(callDuration)
+            : "";
+
+  const showVideoUI = callType === "video" && callState === "connected";
+
+  return (
+    <>
+      {/* Hidden audio element for audio calls */}
+      <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: "none" }} />
+
+      {(callState !== "idle" || callError) && (
+        <div className={`call-overlay ${showVideoUI ? "call-overlay--video-active" : ""}`}>
+          {callError ? (
+            <div className="call-overlay-card">
+              <p className="call-overlay-error">{callError}</p>
+              <button
+                type="button"
+                className="call-btn call-btn--end"
+                onClick={onClearError}
+              >
+                OK
+              </button>
+            </div>
+          ) : showVideoUI ? (
+            /* Connected Video Call Layout */
+            <div className="video-call-container">
+              <video
+                ref={remoteVideoRef}
+                autoPlay
+                playsInline
+                className="video-stream video-stream--remote"
+              />
+
+              <div className="video-local-wrapper">
+                <video
+                  ref={localVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className={`video-stream video-stream--local ${!isVideoEnabled ? "video-stream--hidden" : ""}`}
+                />
+                {!isVideoEnabled && (
+                  <div className="video-local-placeholder">
+                    <span>Камера выключена</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="video-controls-panel">
+                <div className="video-peer-info">
+                  <h3 className="video-peer-name">{peer?.name}</h3>
+                  <p className="video-call-duration">{formatCallDuration(callDuration)}</p>
+                </div>
+                <div className="video-actions">
+                  <button
+                    type="button"
+                    className={`call-btn call-btn--mute ${isMuted ? "active" : ""}`}
+                    onClick={onToggleMute}
+                    aria-label={isMuted ? "Включить микрофон" : "Выключить микрофон"}
+                  >
+                    <FontAwesomeIcon icon={isMuted ? faMicrophoneSlash : faMicrophone} />
+                  </button>
+                  <button
+                    type="button"
+                    className={`call-btn call-btn--video ${!isVideoEnabled ? "active" : ""}`}
+                    onClick={onToggleVideo}
+                    aria-label={isVideoEnabled ? "Выключить камеру" : "Включить камеру"}
+                  >
+                    <FontAwesomeIcon icon={isVideoEnabled ? faVideo : faVideoSlash} />
+                  </button>
+                  <button
+                    type="button"
+                    className="call-btn call-btn--end"
+                    onClick={onEnd}
+                    aria-label="Завершить звонок"
+                  >
+                    <FontAwesomeIcon icon={faPhoneSlash} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Audio Call / Connecting Video Call Layout */
+            <div className="call-overlay-card">
+              <div className="call-overlay-avatar">
+                {(peer?.name || "?")[0].toUpperCase()}
+              </div>
+              <h3 className="call-overlay-name">{peer?.name}</h3>
+              <p className="call-overlay-status">{statusText}</p>
+
+              <div className="call-overlay-actions">
+                {callState === "incoming" && (
+                  <>
+                    <button
+                      type="button"
+                      className="call-btn call-btn--accept"
+                      onClick={onAccept}
+                      aria-label="Принять"
+                    >
+                      <FontAwesomeIcon icon={faPhone} />
+                    </button>
+                    <button
+                      type="button"
+                      className="call-btn call-btn--reject"
+                      onClick={onReject}
+                      aria-label="Отклонить"
+                    >
+                      <FontAwesomeIcon icon={faPhoneSlash} />
+                    </button>
+                  </>
+                )}
+
+                {(callState === "outgoing" || callState === "connecting") && (
+                  <button
+                    type="button"
+                    className="call-btn call-btn--end"
+                    onClick={onEnd}
+                    aria-label="Отменить"
+                  >
+                    <FontAwesomeIcon icon={faPhoneSlash} />
+                  </button>
+                )}
+
+                {callState === "connected" && (
+                  <>
+                    <button
+                      type="button"
+                      className={`call-btn call-btn--mute ${isMuted ? "active" : ""}`}
+                      onClick={onToggleMute}
+                      aria-label={isMuted ? "Включить микрофон" : "Выключить микрофон"}
+                    >
+                      <FontAwesomeIcon
+                        icon={isMuted ? faMicrophoneSlash : faMicrophone}
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      className="call-btn call-btn--end"
+                      onClick={onEnd}
+                      aria-label="Завершить"
+                    >
+                      <FontAwesomeIcon icon={faPhoneSlash} />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
