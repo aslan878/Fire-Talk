@@ -24,7 +24,17 @@ const messageSchema = new mongoose_1.default.Schema({
     },
     kind: {
         type: String,
-        enum: ["text", "image", "file", "voice", "video", "sticker", "system"],
+        enum: [
+            "text",
+            "image",
+            "file",
+            "voice",
+            "video",
+            "sticker",
+            "poll",
+            "todo",
+            "system",
+        ],
         default: "text",
     },
     text: {
@@ -40,6 +50,31 @@ const messageSchema = new mongoose_1.default.Schema({
         durationSec: { type: Number, default: null },
         publicId: { type: String, default: null },
     },
+    poll: {
+        question: { type: String, default: "" },
+        options: [{ type: String }],
+        votes: [
+            {
+                userId: { type: mongoose_1.default.Schema.Types.ObjectId, ref: "User" },
+                optionIndex: { type: Number },
+                votedAt: { type: Date, default: Date.now },
+            },
+        ],
+    },
+    todo: {
+        title: { type: String, default: "" },
+        items: [
+            {
+                text: { type: String },
+                completedBy: [
+                    {
+                        userId: { type: mongoose_1.default.Schema.Types.ObjectId, ref: "User" },
+                        completedAt: { type: Date, default: Date.now },
+                    },
+                ],
+            },
+        ],
+    },
     replyTo: {
         type: mongoose_1.default.Schema.Types.ObjectId,
         ref: "Message",
@@ -49,6 +84,21 @@ const messageSchema = new mongoose_1.default.Schema({
         {
             user: { type: mongoose_1.default.Schema.Types.ObjectId, ref: "User" },
             readAt: { type: Date, default: Date.now },
+        },
+    ],
+    reactions: [
+        {
+            emoji: { type: String, required: true },
+            users: [
+                {
+                    user: {
+                        type: mongoose_1.default.Schema.Types.ObjectId,
+                        ref: "User",
+                        required: true,
+                    },
+                    reactedAt: { type: Date, default: Date.now },
+                },
+            ],
         },
     ],
     editedAt: { type: Date, default: null },

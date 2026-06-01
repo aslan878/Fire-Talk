@@ -358,8 +358,12 @@ router.post("/:messageId/react", requireUser, async (req, res) => {
   );
 
   for (const group of reactions) {
-    group.users =
-      group.users?.filter((u) => u.user?.toString() !== req.userId) ?? [];
+    const users = group.users ?? [];
+    for (let i = users.length - 1; i >= 0; i -= 1) {
+      if (users[i].user?.toString() === req.userId) {
+        users.splice(i, 1);
+      }
+    }
   }
 
   if (!hadReaction) {
@@ -375,7 +379,10 @@ router.post("/:messageId/react", requireUser, async (req, res) => {
     }
   }
 
-  msg.reactions = reactions.filter((r) => (r.users?.length ?? 0) > 0);
+  msg.set(
+    "reactions",
+    reactions.filter((r) => (r.users?.length ?? 0) > 0),
+  );
 
   msg.markModified("reactions");
   await msg.save();
@@ -430,14 +437,22 @@ router.post("/:messageId/vote", requireUser, async (req, res) => {
 
   if (existingVote) {
     // Remove vote
-    msg.poll.votes = msg.poll.votes?.filter(
-      (v) =>
-        !(v.userId?.toString() === req.userId && v.optionIndex === optionIndex),
+    msg.set(
+      "poll.votes",
+      msg.poll.votes?.filter(
+        (v) =>
+          !(
+            v.userId?.toString() === req.userId &&
+            v.optionIndex === optionIndex
+          ),
+      ),
     );
   } else {
     // Remove previous vote from this user and add new vote
-    msg.poll.votes =
-      msg.poll.votes?.filter((v) => v.userId?.toString() !== req.userId) || [];
+    msg.set(
+      "poll.votes",
+      msg.poll.votes?.filter((v) => v.userId?.toString() !== req.userId) || [],
+    );
     msg.poll.votes.push({
       userId: new mongoose.Types.ObjectId(req.userId!),
       optionIndex,
@@ -503,9 +518,11 @@ router.post(
 
     if (alreadyCompleted) {
       // Remove completion
-      item.completedBy =
+      item.set(
+        "completedBy",
         item.completedBy?.filter((c) => c.userId?.toString() !== userIdStr) ||
-        [];
+          [],
+      );
     } else {
       // Add completion
       item.completedBy = item.completedBy || [];
