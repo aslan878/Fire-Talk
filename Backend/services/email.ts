@@ -12,11 +12,66 @@ const smtpSecure =
   process.env.SMTP_SECURE !== undefined
     ? process.env.SMTP_SECURE === "true"
     : smtpPort === 465;
+const resendApiKey = process.env.RESEND_API_KEY;
+const emailFrom = process.env.EMAIL_FROM || process.env.SMTP_FROM || "FireTalk <onboarding@resend.dev>";
+
+function buildOtpEmailHtml(otpCode: string) {
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 12px; background-color: #ffffff;">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <span style="font-size: 32px; font-weight: bold; color: #3390ec;">FireTalk</span>
+      </div>
+      <h2 style="color: #333333; text-align: center; margin-bottom: 12px;">Verification Code</h2>
+      <p style="color: #666666; font-size: 16px; line-height: 1.5; text-align: center; margin-bottom: 24px;">
+        Use this secure one-time code to log in to your FireTalk profile. The code is valid for 5 minutes.
+      </p>
+      <div style="text-align: center; margin-bottom: 32px;">
+        <span style="display: inline-block; font-size: 36px; font-weight: bold; color: #3390ec; letter-spacing: 6px; padding: 12px 24px; background-color: #f0f7ff; border-radius: 8px; border: 1px dashed #3390ec;">
+          ${otpCode}
+        </span>
+      </div>
+      <p style="color: #999999; font-size: 12px; text-align: center; border-top: 1px solid #e0e0e0; padding-top: 16px; margin: 0;">
+        If you did not request this email, simply ignore it.
+      </p>
+    </div>
+  `;
+}
+
+async function sendWithResend(toEmail: string, otpCode: string): Promise<void> {
+  if (!resendApiKey) {
+    throw new Error("RESEND_API_KEY is not configured.");
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: emailFrom,
+      to: [toEmail],
+      subject: `FireTalk Verification Code: ${otpCode}`,
+      text: `Your FireTalk verification code: ${otpCode}. The code is valid for 5 minutes.`,
+      html: buildOtpEmailHtml(otpCode),
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Resend email failed (${response.status}): ${errorText}`);
+  }
+}
 
 export const sendOtpEmail = async (toEmail: string, otpCode: string): Promise<void> => {
+  if (resendApiKey) {
+    await sendWithResend(toEmail, otpCode);
+    return;
+  }
+
   if (!smtpUser || !smtpPass) {
     throw new Error(
-      "SMTP credentials are not configured in .env. Please add SMTP_USER and SMTP_PASS to your .env file."
+      "Email delivery is not configured. Please add RESEND_API_KEY or SMTP_USER/SMTP_PASS."
     );
   }
 
@@ -36,31 +91,11 @@ export const sendOtpEmail = async (toEmail: string, otpCode: string): Promise<vo
 
   const transporter = nodemailer.createTransport(transportOptions);
 
-  const htmlContent = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 12px; background-color: #ffffff;">
-      <div style="text-align: center; margin-bottom: 24px;">
-        <span style="font-size: 32px; font-weight: bold; color: #3390ec;">FireTalk</span>
-      </div>
-      <h2 style="color: #333333; text-align: center; margin-bottom: 12px;">Verification Code</h2>
-      <p style="color: #666666; font-size: 16px; line-height: 1.5; text-align: center; margin-bottom: 24px;">
-        Use this secure one-time code to log in to your FireTalk profile. The code is valid for 5 minutes.
-      </p>
-      <div style="text-align: center; margin-bottom: 32px;">
-        <span style="display: inline-block; font-size: 36px; font-weight: bold; color: #3390ec; letter-spacing: 6px; padding: 12px 24px; background-color: #f0f7ff; border-radius: 8px; border: 1px dashed #3390ec;">
-          ${otpCode}
-        </span>
-      </div>
-      <p style="color: #999999; font-size: 12px; text-align: center; border-top: 1px solid #e0e0e0; padding-top: 16px; margin: 0;">
-        If you did not request this email, simply ignore it.
-      </p>
-    </div>
-  `;
-
   await transporter.sendMail({
     from: smtpFrom,
     to: toEmail,
     subject: `FireTalk Verification Code: ${otpCode}`,
     text: `Your FireTalk verification code: ${otpCode}. The code is valid for 5 minutes.`,
-    html: htmlContent,
+    html: buildOtpEmailHtml(otpCode),
   });
 };
