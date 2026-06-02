@@ -153,7 +153,12 @@ router.post("/email/send", async (req, res, next) => {
             attempts: 3,
         };
         await redis_1.default.setEx(`otp:email:${cleanEmail}`, 300, JSON.stringify(otpData));
-        await (0, email_1.sendOtpEmail)(cleanEmail, otpCode);
+        if (process.env.EMAIL_DELIVERY === "log") {
+            console.log("[EMAIL SENDER] EMAIL_DELIVERY=log, skipping SMTP send.");
+        }
+        else {
+            await (0, email_1.sendOtpEmail)(cleanEmail, otpCode);
+        }
         console.log("\n==============================================");
         console.log(`[EMAIL SENDER] OTP Code for ${cleanEmail} is: \x1b[36m${otpCode}\x1b[0m`);
         console.log("==============================================\n");

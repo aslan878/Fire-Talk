@@ -15,15 +15,18 @@ const user_1 = __importDefault(require("./models/user"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = Number(process.env.PORT) || 5000;
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
-app.use((0, cors_1.default)({ origin: FRONTEND_URL }));
+const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin && origin !== "none");
+app.use((0, cors_1.default)({ origin: allowedOrigins }));
 app.use(express_1.default.json({ limit: "50mb" }));
 app.use(express_1.default.urlencoded({ limit: "50mb", extended: true }));
 app.use("/api", index_1.default);
 const httpServer = (0, http_1.createServer)(app);
 const io = new socket_io_1.Server(httpServer, {
     cors: {
-        origin: FRONTEND_URL,
+        origin: allowedOrigins,
         methods: ["GET", "POST"],
     },
 });

@@ -8,6 +8,10 @@ const smtpPort = parseInt(process.env.SMTP_PORT || "465");
 const smtpUser = process.env.SMTP_USER;
 const smtpPass = process.env.SMTP_PASS;
 const smtpFrom = process.env.SMTP_FROM || `"FireTalk" <${smtpUser}>`;
+const smtpSecure =
+  process.env.SMTP_SECURE !== undefined
+    ? process.env.SMTP_SECURE === "true"
+    : smtpPort === 465;
 
 export const sendOtpEmail = async (toEmail: string, otpCode: string): Promise<void> => {
   if (!smtpUser || !smtpPass) {
@@ -16,15 +20,21 @@ export const sendOtpEmail = async (toEmail: string, otpCode: string): Promise<vo
     );
   }
 
-  const transporter = nodemailer.createTransport({
+  const transportOptions: any = {
     host: smtpHost,
     port: smtpPort,
-    secure: smtpPort === 465,
+    secure: smtpSecure,
+    family: 4,
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 30000,
     auth: {
       user: smtpUser,
       pass: smtpPass,
     },
-  });
+  };
+
+  const transporter = nodemailer.createTransport(transportOptions);
 
   const htmlContent = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 12px; background-color: #ffffff;">
