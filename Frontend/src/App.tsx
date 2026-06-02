@@ -10,6 +10,7 @@ import {
 } from "react-router-dom";
 import "./App.css";
 import { api } from "./services/api";
+import { SOCKET_URL } from "./config";
 import { io } from "socket.io-client";
 
 import { ChatSidebar } from "./components/ChatSidebar";
@@ -306,7 +307,7 @@ function App() {
       socketRef.current.disconnect();
     }
 
-    const socket = io("http://localhost:5000", {
+    const socket = io(SOCKET_URL, {
       auth: { userId: currentUserData.id },
     });
 

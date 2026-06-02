@@ -1,3 +1,5 @@
+import { API_URL } from "../config";
+
 export interface UserProfile {
   id: string;
   email?: string;
@@ -167,7 +169,7 @@ export interface MessageResponse {
   updatedAt: string;
 }
 
-const BASE_URL = "http://localhost:5000/api";
+const BASE_URL = API_URL;
 
 /**
  * Generic helper for type-safe API requests.

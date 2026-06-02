@@ -6,6 +6,7 @@ import { faFire } from "@fortawesome/free-solid-svg-icons";
 import { QRCodeSVG } from "qrcode.react";
 import { io } from "socket.io-client";
 import { api } from "../services/api";
+import { SOCKET_URL } from "../config";
 
 interface AuthProps {
   onLoginSuccess: (user: { id: string; name: string; isGuest?: boolean }) => void;
@@ -99,7 +100,7 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
         const data = await api.auth.generateQrToken();
         setQrToken(data.token);
 
-        socket = io("http://localhost:5000");
+        socket = io(SOCKET_URL);
 
         socket.on("connect", () => {
           socket.emit("join_qr_room", data.token);
