@@ -497,4 +497,95 @@ router.post("/qr-login", async (req, res, next) => {
   }
 });
 
+router.post("/clerk", async (req, res, next) => {
+  try {
+    const { token } = req.body as { token?: string };
+    if (!token) {
+      res.status(400).json({ error: "Token is required" });
+      return;
+    }
+
+    const secretKey = process.env.CLERK_SECRET_KEY;
+    if (!secretKey) {
+      res.status(500).json({ error: "Clerk Secret Key is not configured on the server" });
+      return;
+    }
+
+    const { createClerkClient, verifyToken } = await import("@clerk/backend");
+    const clerkClient = createClerkClient({ secretKey });
+
+    let userId: string;
+    try {
+      const decoded = await verifyToken(token, { secretKey });
+      userId = decoded.sub;
+    } catch (err: any) {
+      res.status(401).json({ error: `Invalid Clerk token: ${err.message || err}` });
+      return;
+    }
+
+    // Retrieve user details from Clerk
+    const clerkUser = await clerkClient.users.getUser(userId);
+    const email = clerkUser.emailAddresses[0]?.emailAddress?.toLowerCase() || "";
+    const firstName = clerkUser.firstName || clerkUser.username || `User_${userId.slice(-6)}`;
+    const lastName = clerkUser.lastName || "";
+    const username = clerkUser.username || undefined;
+    const avatarUrl = clerkUser.imageUrl || null;
+
+    // Find user in MongoDB
+    let user = await User.findOne({ clerkId: userId });
+    if (!user && email) {
+      user = await User.findOne({ email });
+    }
+
+    if (user) {
+      // Update existing user with Clerk ID if not already linked
+      let hasChanges = false;
+      if (!user.clerkId) {
+        user.clerkId = userId;
+        hasChanges = true;
+      }
+      if (avatarUrl && (!user.avatar || !user.avatar.url)) {
+        user.avatar = { url: avatarUrl, publicId: null };
+        hasChanges = true;
+      }
+      if (hasChanges) {
+        await user.save();
+      }
+    } else {
+      // Create new user in local MongoDB
+      user = await User.create({
+        clerkId: userId,
+        email: email || undefined,
+        firstName,
+        lastName,
+        username,
+        avatar: avatarUrl ? { url: avatarUrl, publicId: null } : undefined,
+        status: "online",
+      });
+    }
+
+    user.status = "online";
+    await user.save();
+
+    const { accessToken, refreshToken } = generateTokens({ userId: user._id.toString() });
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        email: user.email,
+        phone: user.phone,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        username: user.username,
+        avatar: user.avatar,
+      },
+      accessToken,
+      refreshToken,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

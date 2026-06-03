@@ -12,6 +12,7 @@ import "./App.css";
 import { api } from "./services/api";
 import { SOCKET_URL } from "./config";
 import { io } from "socket.io-client";
+import { useClerk } from "@clerk/clerk-react";
 
 import { ChatSidebar } from "./components/ChatSidebar";
 import { MainChat } from "./components/MainChat";
@@ -229,6 +230,7 @@ function MainLayout({
 }
 
 function App() {
+  const { signOut } = useClerk();
   const [currentUserData, setCurrentUserData] =
     useState<CurrentUserData | null>(() => {
       const saved = localStorage.getItem("chat_user");
@@ -1011,11 +1013,16 @@ function App() {
     setCurrentUserData(user);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     localStorage.removeItem("chat_user");
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
     setCurrentUserData(null);
+    try {
+      await signOut();
+    } catch (e) {
+      console.error("Clerk sign out error:", e);
+    }
   };
 
   // Filter chats by tab

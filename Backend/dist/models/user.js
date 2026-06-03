@@ -17,6 +17,12 @@ const userSchema = new mongoose_1.default.Schema({
         sparse: true,
         trim: true,
     },
+    clerkId: {
+        type: String,
+        unique: true,
+        sparse: true,
+        trim: true,
+    },
     username: {
         type: String,
         unique: true,

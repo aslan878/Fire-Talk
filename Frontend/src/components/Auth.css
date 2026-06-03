@@ -373,3 +373,40 @@ body.light-theme .qr-instructions li strong {
 .qr-simulate-btn:hover {
   background-color: #2e9648;
 }
+
+/* Clerk custom styles */
+.clerk-signin-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.auth-loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.auth-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(225, 29, 72, 0.1);
+  border-top-color: #e11d48;
+  border-radius: 50%;
+  animation: auth-spin 1s linear infinite;
+}
+
+.auth-loading-text {
+  margin-top: 16px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+@keyframes auth-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

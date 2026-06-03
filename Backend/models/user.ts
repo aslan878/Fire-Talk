@@ -14,6 +14,12 @@ const userSchema = new mongoose.Schema(
       sparse: true,
       trim: true,
     },
+    clerkId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+    },
 
     username: {
       type: String,

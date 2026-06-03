@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -426,6 +459,90 @@ router.post("/qr-login", async (req, res, next) => {
                 firstName: user.firstName,
                 lastName: user.lastName,
                 username: user.username,
+            },
+            accessToken,
+            refreshToken,
+        });
+    }
+    catch (err) {
+        next(err);
+    }
+});
+router.post("/clerk", async (req, res, next) => {
+    try {
+        const { token } = req.body;
+        if (!token) {
+            res.status(400).json({ error: "Token is required" });
+            return;
+        }
+        const secretKey = process.env.CLERK_SECRET_KEY;
+        if (!secretKey) {
+            res.status(500).json({ error: "Clerk Secret Key is not configured on the server" });
+            return;
+        }
+        const { createClerkClient, verifyToken } = await Promise.resolve().then(() => __importStar(require("@clerk/backend")));
+        const clerkClient = createClerkClient({ secretKey });
+        let userId;
+        try {
+            const decoded = await verifyToken(token, { secretKey });
+            userId = decoded.sub;
+        }
+        catch (err) {
+            res.status(401).json({ error: `Invalid Clerk token: ${err.message || err}` });
+            return;
+        }
+        // Retrieve user details from Clerk
+        const clerkUser = await clerkClient.users.getUser(userId);
+        const email = clerkUser.emailAddresses[0]?.emailAddress?.toLowerCase() || "";
+        const firstName = clerkUser.firstName || clerkUser.username || `User_${userId.slice(-6)}`;
+        const lastName = clerkUser.lastName || "";
+        const username = clerkUser.username || undefined;
+        const avatarUrl = clerkUser.imageUrl || null;
+        // Find user in MongoDB
+        let user = await user_1.default.findOne({ clerkId: userId });
+        if (!user && email) {
+            user = await user_1.default.findOne({ email });
+        }
+        if (user) {
+            // Update existing user with Clerk ID if not already linked
+            let hasChanges = false;
+            if (!user.clerkId) {
+                user.clerkId = userId;
+                hasChanges = true;
+            }
+            if (avatarUrl && (!user.avatar || !user.avatar.url)) {
+                user.avatar = { url: avatarUrl, publicId: null };
+                hasChanges = true;
+            }
+            if (hasChanges) {
+                await user.save();
+            }
+        }
+        else {
+            // Create new user in local MongoDB
+            user = await user_1.default.create({
+                clerkId: userId,
+                email: email || undefined,
+                firstName,
+                lastName,
+                username,
+                avatar: avatarUrl ? { url: avatarUrl, publicId: null } : undefined,
+                status: "online",
+            });
+        }
+        user.status = "online";
+        await user.save();
+        const { accessToken, refreshToken } = (0, jwt_1.generateTokens)({ userId: user._id.toString() });
+        res.json({
+            success: true,
+            user: {
+                id: user._id,
+                email: user.email,
+                phone: user.phone,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                username: user.username,
+                avatar: user.avatar,
             },
             accessToken,
             refreshToken,
