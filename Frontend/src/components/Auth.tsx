@@ -456,6 +456,9 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
 
         {error && <div className="auth-error">{error}</div>}
 
+        {/* Required for Clerk custom flows Bot Protection / CAPTCHA */}
+        <div id="clerk-captcha" />
+
         {loading && (
           <div className="auth-loading-container">
             <div className="auth-spinner"></div>

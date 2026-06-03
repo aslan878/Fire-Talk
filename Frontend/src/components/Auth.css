@@ -439,6 +439,18 @@ body.light-theme .auth-subtitle {
   }
 }
 
+/* Clerk CAPTCHA container styling for custom flows */
+#clerk-captcha {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#clerk-captcha:not(:empty) {
+  margin: 16px 0;
+}
+
 /* ===== Responsive / Adaptive Design ===== */
 
 /* Tablets & small laptops */
