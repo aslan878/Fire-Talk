@@ -9,7 +9,12 @@ const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '';
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     {CLERK_PUBLISHABLE_KEY ? (
-      <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+      <ClerkProvider 
+        publishableKey={CLERK_PUBLISHABLE_KEY}
+        localization={{
+          formButtonPrimary: "NEXT",
+        }}
+      >
         <App />
       </ClerkProvider>
     ) : (

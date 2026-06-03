@@ -1,3 +1,4 @@
+/* Screen Background */
 .auth-screen {
   position: relative;
   width: 100vw;
@@ -5,49 +6,42 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--bg-panel);
+  background-color: #171a20;
+  /* Deep blue-grey background */
   overflow: hidden;
-  font-family: inherit;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
-/* Override aurora glow with simple soft flat ambient overlays (no gradients) */
-.auth-glow-1,
-.auth-glow-2 {
-  display: none;
-}
-
+/* Centered Form Wrapper (Borderless, transparent, flat) */
 .auth-card {
   position: relative;
   z-index: 10;
   width: 100%;
-  height: 100%;
-  padding: 40px 32px;
-  background-color: var(--bg-panel);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  max-width: 420px;
+  padding: 40px 24px;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  border: none;
-  box-shadow: none;
+  box-sizing: border-box;
+  overflow-y: auto;
+  max-height: 100vh;
 }
 
-body.light-theme .auth-card {
-  background-color: #ffffff;
-  border: none;
-  box-shadow: none;
-}
 
-.auth-card > * {
-  width: 100%;
-  max-width: 380px;
-}
-
-.auth-logo-container {
-  margin-bottom: 32px;
+/* Brand Section */
+.auth-logo-section {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 32px;
+  text-align: center;
   width: 100%;
 }
 
@@ -56,87 +50,60 @@ body.light-theme .auth-card {
   height: 120px;
   border-radius: 50%;
   background-color: #ec3333;
+  /* Flat brand red */
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(51, 144, 236, 0.2);
+  margin-bottom: 24px;
 }
 
-.auth-logo-circle svg {
-  display: block;
+.auth-logo-icon {
+  font-size: 56px;
+  color: #ffffff;
 }
 
-.auth-title {
+.auth-brand-name {
   font-size: 28px;
   font-weight: 500;
+  color: #ffffff;
   margin: 0 0 12px;
-  text-align: center;
-  color: var(--text-main);
   letter-spacing: -0.2px;
 }
 
-body.light-theme .auth-title {
-  color: #000000;
-}
-
-.auth-subtitle {
+.auth-brand-tagline {
   font-size: 15px;
   color: var(--text-muted);
-  text-align: center;
-  margin: 0 0 36px;
+  /* #9aa6b6 */
+  margin: 0;
   line-height: 1.5;
   font-weight: 400;
 }
 
-body.light-theme .auth-subtitle {
-  color: #707579;
-}
-
-.auth-error {
-  width: 100%;
-  background-color: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.25);
-  color: #ef4444;
-  padding: 12px 16px;
-  border-radius: 10px;
-  font-size: 14px;
-  margin-bottom: 24px;
-  text-align: center;
-  animation: shake 0.4s ease-in-out;
-}
-
-.auth-form {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Telegram Material Outline Input Style */
+/* Outlined Input Wrapper */
 .auth-input-group {
   position: relative;
   width: 100%;
   border: 1px solid var(--border);
+  /* #2e2e38 */
   border-radius: 10px;
   margin-bottom: 24px;
   padding: 14px 16px 12px;
-  background-color: var(--bg-panel);
+  background-color: transparent;
   display: flex;
   align-items: center;
   justify-content: space-between;
   box-sizing: border-box;
-}
-
-body.light-theme .auth-input-group {
-  border-color: #dadce0;
-  background-color: #ffffff;
+  transition: border-color 0.15s ease;
 }
 
 .auth-input-group:focus-within {
-  border-color: #3390ec;
-  border-width: 2px;
-  padding: 13px 15px 11px; /* Offset border width change to avoid layout shift */
+  border: 2px solid #3390ec;
+  /* Telegram blue highlight */
+  padding: 13px 15px 11px;
+  /* Offset border change */
 }
 
+/* Outlined Floating Label */
 .auth-input-label {
   position: absolute;
   top: -8px;
@@ -144,23 +111,20 @@ body.light-theme .auth-input-group {
   font-size: 11px;
   font-weight: 500;
   padding: 0 4px;
-  background-color: var(--bg-panel);
+  background-color: #171a20;
+  /* Mask top border */
   color: var(--text-muted);
   pointer-events: none;
-  transition:
-    color 0.15s ease,
-    background-color 0.15s ease;
-}
-
-body.light-theme .auth-input-label {
-  background-color: #ffffff;
-  color: #707579;
+  transition: color 0.15s ease;
+  z-index: 5;
 }
 
 .auth-input-group:focus-within .auth-input-label {
   color: #3390ec;
+  /* Active label blue */
 }
 
+/* Raw input styling */
 .auth-select,
 .auth-input {
   width: 100%;
@@ -168,15 +132,10 @@ body.light-theme .auth-input-label {
   background: transparent;
   outline: none;
   font-size: 16px;
-  color: var(--text-main);
+  color: #ffffff;
   font-family: inherit;
   padding: 0;
   box-sizing: border-box;
-}
-
-body.light-theme .auth-select,
-body.light-theme .auth-input {
-  color: #000000;
 }
 
 .auth-select {
@@ -190,15 +149,23 @@ body.light-theme .auth-input {
   right: 16px;
   pointer-events: none;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 
-body.light-theme .dropdown-chevron {
-  color: #707579;
+/* Autofill styling overrides */
+.auth-input:-webkit-autofill,
+.auth-input:-webkit-autofill:hover,
+.auth-input:-webkit-autofill:focus,
+.auth-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #171a20 inset !important;
+  -webkit-text-fill-color: #ffffff !important;
+  transition: background-color 5000s ease-in-out 0s;
 }
 
+/* Main SUBMIT button (Solid Telegram Blue) */
 .auth-submit-btn {
   background-color: #3390ec;
+  /* Solid blue */
   color: #ffffff;
   border: none;
   border-radius: 10px;
@@ -206,19 +173,22 @@ body.light-theme .dropdown-chevron {
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    transform 0.1s ease;
   width: 100%;
   letter-spacing: 0.3px;
   text-transform: uppercase;
   margin-top: 8px;
+  height: 50px;
 }
 
 .auth-submit-btn:hover {
-  filter: brightness(1.08);
+  background-color: #2481cc;
 }
 
 .auth-submit-btn:active {
-  transform: scale(0.98);
+  transform: scale(0.99);
 }
 
 .auth-submit-btn:disabled {
@@ -227,7 +197,45 @@ body.light-theme .dropdown-chevron {
   transform: none;
 }
 
-/* Bottom Links section */
+/* Social Buttons Container */
+.auth-social-container {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+/* Flat Social Outlined Buttons */
+.auth-social-btn {
+  background-color: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  font-size: 15px;
+  font-weight: 500;
+  border-radius: 10px;
+  height: 50px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+  width: 100%;
+}
+
+.auth-social-btn:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+  border-color: var(--text-muted);
+}
+
+.social-svg-icon {
+  flex-shrink: 0;
+}
+
+/* Bottom Navigation Links */
 .auth-bottom-links {
   display: flex;
   flex-direction: column;
@@ -255,32 +263,15 @@ body.light-theme .dropdown-chevron {
   text-decoration: underline;
 }
 
-/* Animations */
-@keyframes shake {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  25% {
-    transform: translateX(-4px);
-  }
-  75% {
-    transform: translateX(4px);
-  }
+.auth-link-btn-telegram.guest-link {
+  color: var(--text-muted);
 }
 
-@keyframes slideUpFade {
-  0% {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.auth-link-btn-telegram.guest-link:hover {
+  color: #ffffff;
 }
 
-/* QR Code Section */
+/* QR Code UI */
 .qr-container {
   display: flex;
   flex-direction: column;
@@ -289,7 +280,6 @@ body.light-theme .dropdown-chevron {
 }
 
 .qr-code-box {
-  position: relative;
   width: 200px;
   height: 200px;
   background-color: #ffffff;
@@ -298,59 +288,18 @@ body.light-theme .dropdown-chevron {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-}
-
-.qr-svg {
-  display: block;
-}
-
-/* Solid dark pixels for QR code */
-.qr-svg rect {
-  fill: #000000;
-}
-.qr-svg rect[fill="transparent"] {
-  fill: transparent;
-}
-.qr-svg rect[fill="#ffffff"] {
-  fill: #ffffff;
-}
-
-.qr-center-logo {
-  position: absolute;
-  width: 48px;
-  height: 48px;
-  background-color: #ffffff;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-}
-
-.qr-inner-logo-circle {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background-color: #3390ec;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .qr-instructions {
   width: 100%;
   padding-left: 20px;
-  margin: 0 0 32px;
+  margin: 0 0 24px;
   font-size: 15px;
   line-height: 1.6;
   color: var(--text-muted);
   text-align: left;
-}
-
-body.light-theme .qr-instructions {
-  color: #707579;
 }
 
 .qr-instructions li {
@@ -358,43 +307,97 @@ body.light-theme .qr-instructions {
 }
 
 .qr-instructions li strong {
-  color: var(--text-main);
+  color: #ffffff;
+}
+
+.auth-form {
+  width: 100%;
+}
+
+/* Error banner */
+.auth-error {
+  width: 100%;
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #ef4444;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+/* Light Theme support */
+body.light-theme .auth-screen {
+  background-color: #f1f3f6;
+}
+
+body.light-theme .auth-brand-name {
+  color: #000000;
+}
+
+body.light-theme .auth-brand-tagline {
+  color: #707579;
+}
+
+body.light-theme .auth-input-group {
+  border-color: #dadce0;
+}
+
+body.light-theme .auth-input-group:focus-within {
+  border-color: #3390ec;
+}
+
+body.light-theme .auth-input-label {
+  background-color: #f1f3f6;
+  color: #707579;
+}
+
+body.light-theme .auth-input-group:focus-within .auth-input-label {
+  color: #3390ec;
+}
+
+body.light-theme .auth-select,
+body.light-theme .auth-input {
+  color: #000000;
+}
+
+body.light-theme .auth-input:-webkit-autofill,
+body.light-theme .auth-input:-webkit-autofill:hover,
+body.light-theme .auth-input:-webkit-autofill:focus,
+body.light-theme .auth-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #f1f3f6 inset !important;
+  -webkit-text-fill-color: #000000 !important;
+}
+
+body.light-theme .auth-social-btn {
+  background-color: #ffffff;
+  border-color: #dadce0;
+  color: #000000;
+}
+
+body.light-theme .auth-social-btn:hover {
+  background-color: #f7f8fa;
 }
 
 body.light-theme .qr-instructions li strong {
   color: #000000;
 }
 
-.qr-simulate-btn {
-  background-color: #34a853; /* Nice green for simulate action */
-  margin-top: 0;
-}
-
-.qr-simulate-btn:hover {
-  background-color: #2e9648;
-}
-
-/* Clerk custom styles */
-.clerk-signin-wrapper {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-}
-
+/* Loading spinner & Title overrides */
 .auth-loading-container {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px;
+  padding: 30px 0;
 }
 
 .auth-spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid rgba(225, 29, 72, 0.1);
-  border-top-color: #e11d48;
+  border: 3px solid rgba(51, 144, 236, 0.12);
+  border-top-color: #3390ec;
   border-radius: 50%;
   animation: auth-spin 1s linear infinite;
 }
@@ -405,8 +408,235 @@ body.light-theme .qr-instructions li strong {
   font-size: 14px;
 }
 
+.auth-title {
+  font-size: 28px;
+  font-weight: 500;
+  margin: 0 0 12px;
+  text-align: center;
+  color: #ffffff;
+}
+
+.auth-subtitle {
+  font-size: 15px;
+  color: var(--text-muted);
+  text-align: center;
+  margin: 0 0 28px;
+  line-height: 1.5;
+}
+
+body.light-theme .auth-title {
+  color: #000000;
+}
+
+body.light-theme .auth-subtitle {
+  color: #707579;
+}
+
+/* Animations */
 @keyframes auth-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* ===== Responsive / Adaptive Design ===== */
+
+/* Tablets & small laptops */
+@media (max-width: 768px) {
+  .auth-card {
+    max-width: 380px;
+    padding: 32px 20px;
+  }
+
+  .auth-logo-circle {
+    width: 100px;
+    height: 100px;
+    margin-bottom: 20px;
+  }
+
+  .auth-logo-icon {
+    font-size: 46px;
+  }
+
+  .auth-brand-name {
+    font-size: 24px;
+    margin-bottom: 8px;
+  }
+
+  .auth-brand-tagline {
+    font-size: 14px;
+  }
+
+  .auth-social-container {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Mobile phones */
+@media (max-width: 480px) {
+  .auth-screen {
+    align-items: flex-start;
+  }
+
+  .auth-card {
+    max-width: 100%;
+    padding: 24px 16px;
+    padding-top: 48px;
+    border-radius: 0;
+  }
+
+  .auth-logo-circle {
+    width: 88px;
+    height: 88px;
+    margin-bottom: 16px;
+  }
+
+  .auth-logo-icon {
+    font-size: 40px;
+  }
+
+  .auth-brand-name {
+    font-size: 22px;
+    margin-bottom: 6px;
+  }
+
+  .auth-brand-tagline {
+    font-size: 13px;
+  }
+
+  .auth-logo-section {
+    margin-bottom: 24px;
+  }
+
+  .auth-input-group {
+    margin-bottom: 18px;
+    padding: 12px 14px 10px;
+  }
+
+  .auth-input-group:focus-within {
+    padding: 11px 13px 9px;
+  }
+
+  .auth-submit-btn {
+    height: 46px;
+    font-size: 14px;
+  }
+
+  .auth-social-container {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .auth-social-btn {
+    height: 46px;
+    font-size: 14px;
+  }
+
+  .auth-bottom-links {
+    margin-top: 24px;
+    gap: 12px;
+  }
+
+  .auth-link-btn-telegram {
+    font-size: 13px;
+  }
+
+  .qr-code-box {
+    width: 180px;
+    height: 180px;
+  }
+
+  .qr-instructions {
+    font-size: 14px;
+  }
+
+  .auth-title {
+    font-size: 22px;
+  }
+
+  .auth-subtitle {
+    font-size: 13px;
+  }
+}
+
+/* Very small screens (iPhone SE, etc.) */
+@media (max-width: 360px) {
+  .auth-card {
+    padding: 20px 12px;
+    padding-top: 32px;
+  }
+
+  .auth-logo-circle {
+    width: 72px;
+    height: 72px;
+    margin-bottom: 12px;
+  }
+
+  .auth-logo-icon {
+    font-size: 34px;
+  }
+
+  .auth-brand-name {
+    font-size: 20px;
+  }
+
+  .auth-brand-tagline {
+    font-size: 12px;
+  }
+
+  .auth-submit-btn {
+    height: 44px;
+  }
+
+  .auth-social-btn {
+    height: 44px;
+    font-size: 13px;
+    gap: 8px;
+  }
+
+  .qr-code-box {
+    width: 160px;
+    height: 160px;
+  }
+}
+
+/* Landscape phones */
+@media (max-height: 500px) {
+  .auth-screen {
+    align-items: flex-start;
+  }
+
+  .auth-card {
+    padding-top: 16px;
+    max-height: 100vh;
+    overflow-y: auto;
+  }
+
+  .auth-logo-circle {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 8px;
+  }
+
+  .auth-logo-icon {
+    font-size: 30px;
+  }
+
+  .auth-brand-name {
+    font-size: 20px;
+    margin-bottom: 4px;
+  }
+
+  .auth-logo-section {
+    margin-bottom: 16px;
+  }
+
+  .auth-input-group {
+    margin-bottom: 14px;
+  }
+
+  .auth-bottom-links {
+    margin-top: 16px;
+    gap: 10px;
   }
 }

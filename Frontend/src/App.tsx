@@ -12,7 +12,7 @@ import "./App.css";
 import { api } from "./services/api";
 import { SOCKET_URL } from "./config";
 import { io } from "socket.io-client";
-import { useClerk } from "@clerk/clerk-react";
+import { useClerk, AuthenticateWithRedirectCallback } from "@clerk/clerk-react";
 
 import { ChatSidebar } from "./components/ChatSidebar";
 import { MainChat } from "./components/MainChat";
@@ -1081,6 +1081,11 @@ function App() {
               <Auth onLoginSuccess={handleLoginSuccess} />
             )
           }
+        />
+
+        <Route
+          path="/sso-callback"
+          element={<AuthenticateWithRedirectCallback />}
         />
 
         <Route
