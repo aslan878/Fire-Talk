@@ -527,7 +527,7 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
   return (
     <div className="auth-screen">
       <div className="auth-card">
-        {step !== "register" && (
+        {step !== "register" && step !== "complete-profile" && (
           <div className="auth-logo-section">
             <div className="auth-logo-circle">
               <FontAwesomeIcon icon={faFire} className="auth-logo-icon" />
