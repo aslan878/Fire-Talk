@@ -274,6 +274,54 @@ function MainLayout({
   );
 }
 
+const safeSetLocalStorage = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e: any) {
+    const isQuotaExceeded =
+      e instanceof DOMException &&
+      (e.name === "QuotaExceededError" ||
+        e.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+        e.code === 22 ||
+        e.code === 1014);
+
+    if (isQuotaExceeded) {
+      console.warn("Storage quota exceeded. Evicting older chat caches...");
+      // Evict other chat caches
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith("chat_cache_") && k !== key) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+
+      // Try setting again
+      try {
+        localStorage.setItem(key, value);
+        return;
+      } catch (retryErr) {
+        console.warn("Failed to write cache after evicting others. Truncating current chat messages...", retryErr);
+      }
+
+      // If still fails, try parsing and truncating the message list to last 15 messages
+      try {
+        const parsed = JSON.parse(value);
+        if (parsed && Array.isArray(parsed.formattedMsgs) && parsed.formattedMsgs.length > 15) {
+          parsed.formattedMsgs = parsed.formattedMsgs.slice(-15);
+          localStorage.setItem(key, JSON.stringify(parsed));
+          return;
+        }
+      } catch (truncErr) {
+        console.error("Failed to write truncated cache:", truncErr);
+      }
+    } else {
+      console.error("Failed to write to localStorage:", e);
+    }
+  }
+};
+
 function App() {
   const { signOut } = useClerk();
   const [currentUserData, setCurrentUserData] =
@@ -344,14 +392,10 @@ function App() {
       timers.set(
         chatId,
         setTimeout(() => {
-          try {
-            localStorage.setItem(
-              `chat_cache_${chatId}`,
-              JSON.stringify({ formattedMsgs, chatUsers }),
-            );
-          } catch (e) {
-            console.error("Failed to write chat cache:", e);
-          }
+          safeSetLocalStorage(
+            `chat_cache_${chatId}`,
+            JSON.stringify({ formattedMsgs, chatUsers }),
+          );
           timers.delete(chatId);
         }, CACHE_DEBOUNCE_MS),
       );
@@ -1088,7 +1132,7 @@ function App() {
               const { chatUsers } = JSON.parse(cachedData);
               const cacheMsgs = JSON.parse(localStorage.getItem(`chat_cache_${chatId}`) || "{}").formattedMsgs || [];
               const updatedCacheMsgs = cacheMsgs.map((cm: any) => cm.id === messageId ? newMsg : cm);
-              localStorage.setItem(
+              safeSetLocalStorage(
                 `chat_cache_${chatId}`,
                 JSON.stringify({
                   formattedMsgs: updatedCacheMsgs,

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from "react";
-import { useAuth, useUser, useSignIn, useSignUp } from "@clerk/clerk-react";
+import { useAuth, useUser, useSignIn, useSignUp, useClerk } from "@clerk/clerk-react";
 import "./Auth.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFire, faChevronDown } from "@fortawesome/free-solid-svg-icons";
@@ -13,16 +13,16 @@ interface AuthProps {
   onLoginSuccess: (user: { id: string; name: string; isGuest?: boolean }) => void;
 }
 
-type AuthStep = "email" | "phone" | "code" | "register";
+type AuthStep = "email" | "phone" | "code" | "register" | "complete-profile";
 type LoginMethod = "email" | "phone" | "qr";
 
 const formatPhoneNumber = (value: string): string => {
   const cleaned = value.replace(/[^\d+]/g, "");
-  
+
   if (cleaned.startsWith("+7") || cleaned.startsWith("7") || cleaned.startsWith("8")) {
     let digits = cleaned.replace(/^\+?7|^8/, "");
     digits = digits.replace(/\D/g, "").slice(0, 10);
-    
+
     let formatted = "+7";
     if (digits.length > 0) {
       formatted += " (" + digits.slice(0, 3);
@@ -38,7 +38,7 @@ const formatPhoneNumber = (value: string): string => {
     }
     return formatted;
   }
-  
+
   if (cleaned.startsWith("+")) {
     const digits = cleaned.slice(1).replace(/\D/g, "");
     if (digits.length === 0) return "+";
@@ -47,11 +47,11 @@ const formatPhoneNumber = (value: string): string => {
     if (digits.length <= 10) return `+${digits.slice(0, 3)} ${digits.slice(3, 6)}-${digits.slice(6)}`;
     return `+${digits.slice(0, 3)} ${digits.slice(3, 6)}-${digits.slice(6, 10)}-${digits.slice(10, 14)}`;
   }
-  
+
   if (/^\d/.test(cleaned)) {
     return "+" + cleaned;
   }
-  
+
   return cleaned;
 };
 
@@ -71,6 +71,7 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
   const { getToken } = useAuth();
   const { isLoaded: isSignInLoaded, signIn, setActive } = useSignIn();
   const { isLoaded: isSignUpLoaded, signUp } = useSignUp();
+  const { signOut } = useClerk();
 
   const [loginMethod, setLoginMethod] = useState<LoginMethod>("email");
   const [step, setStep] = useState<AuthStep>("email");
@@ -81,7 +82,11 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [username, setUsername] = useState("");
+  const [bio, setBio] = useState("");
   const [isSigningUp, setIsSigningUp] = useState(false);
+
+  // Temporary user data saved during OAuth profile completion
+  const [tempUser, setTempUser] = useState<{ id: string; name: string; accessToken: string; refreshToken: string } | null>(null);
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -91,6 +96,9 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
   useEffect(() => {
     const authenticateWithBackend = async () => {
       if (!isSignedIn || !clerkUser) return;
+
+      // Don't re-trigger if already on the profile completion step
+      if (step === "complete-profile") return;
 
       setLoading(true);
       setError("");
@@ -118,11 +126,26 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
         localStorage.setItem("accessToken", data.accessToken);
         localStorage.setItem("refreshToken", data.refreshToken);
 
-        onLoginSuccess({
-          id: data.user.id,
-          name: data.user.firstName + (data.user.lastName ? ` ${data.user.lastName}` : ""),
-          isGuest: false,
-        });
+        // If this is a new user or they have no username, prompt for profile completion
+        if (data.isNewUser || !data.user.username) {
+          setFirstName(data.user.firstName || "");
+          setLastName(data.user.lastName || "");
+          setUsername(data.user.username || "");
+          setBio(data.user.bio || "");
+          setTempUser({
+            id: data.user.id,
+            name: data.user.firstName + (data.user.lastName ? ` ${data.user.lastName}` : ""),
+            accessToken: data.accessToken,
+            refreshToken: data.refreshToken,
+          });
+          setStep("complete-profile");
+        } else {
+          onLoginSuccess({
+            id: data.user.id,
+            name: data.user.firstName + (data.user.lastName ? ` ${data.user.lastName}` : ""),
+            isGuest: false,
+          });
+        }
       } catch (err: any) {
         console.error("Backend auth sync error:", err);
         setError(err.message || "Failed to log in with our server. Please try again.");
@@ -132,7 +155,7 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
     };
 
     authenticateWithBackend();
-  }, [isSignedIn, clerkUser, getToken, onLoginSuccess]);
+  }, [isSignedIn, clerkUser, getToken, onLoginSuccess, step]);
 
   // QR Code Login initialization
   useEffect(() => {
@@ -334,7 +357,7 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
     try {
       if (isSigningUp) {
         // Verify sign-up OTP
-        const result = loginMethod === "email" 
+        const result = loginMethod === "email"
           ? await signUp.attemptEmailAddressVerification({ code })
           : await signUp.attemptPhoneNumberVerification({ code });
 
@@ -410,6 +433,75 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
     }
   };
 
+  // Profile completion for OAuth sign-ups
+  const handleProfileCompletionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tempUser) return;
+
+    if (!firstName.trim()) {
+      setError("First name is required");
+      return;
+    }
+
+    const trimmedUsername = username.trim();
+    if (!trimmedUsername) {
+      setError("Nickname (username) is required");
+      return;
+    }
+    if (trimmedUsername.length < 5 || trimmedUsername.length > 32) {
+      setError("Nickname must be between 5 and 32 characters");
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/users/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${tempUser.accessToken}`,
+          "x-user-id": tempUser.id,
+        },
+        body: JSON.stringify({
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          username: trimmedUsername,
+          bio: bio.trim(),
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update profile");
+      }
+
+      onLoginSuccess({
+        id: tempUser.id,
+        name: firstName.trim() + (lastName.trim() ? ` ${lastName.trim()}` : ""),
+        isGuest: false,
+      });
+    } catch (err: any) {
+      setError(err.message || "Failed to save profile. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelProfileCompletion = async () => {
+    setTempUser(null);
+    setStep("email");
+    setError("");
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    try {
+      await signOut();
+    } catch (e) {
+      console.error("Sign out error:", e);
+    }
+  };
+
   // Guest login
   const handleGuestLogin = async () => {
     setError("");
@@ -444,8 +536,8 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
               {step === "code" ? "Enter Code" : "Sign in to Fire Talk"}
             </h1>
             <p className="auth-brand-tagline">
-              {step === "code" 
-                ? `We have sent a verification code to ${loginMethod === "email" ? email : phone}` 
+              {step === "code"
+                ? `We have sent a verification code to ${loginMethod === "email" ? email : phone}`
                 : loginMethod === "phone"
                   ? "Please confirm your country code and enter your phone number."
                   : "Please enter your email address to log in."
@@ -495,10 +587,10 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
                     onClick={() => handleOAuthLogin("oauth_google")}
                   >
                     <svg className="social-svg-icon" viewBox="0 0 48 48" width="20" height="20">
-                      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                      <path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24.01 24.01 0 0 0 0 21.56l7.98-6.19z"/>
-                      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                      <path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24.01 24.01 0 0 0 0 21.56l7.98-6.19z" />
+                      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
                     </svg>
                     Continue with Google
                   </button>
@@ -508,24 +600,13 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
                     onClick={() => handleOAuthLogin("oauth_apple")}
                   >
                     <svg className="social-svg-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                      <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-1 .04-2.21.67-2.93 1.49-.62.69-1.16 1.84-1.01 2.96 1.12.09 2.27-.56 2.95-1.39z"/>
+                      <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-1 .04-2.21.67-2.93 1.49-.62.69-1.16 1.84-1.01 2.96 1.12.09 2.27-.56 2.95-1.39z" />
                     </svg>
                     Continue with Apple
                   </button>
                 </div>
 
                 <div className="auth-bottom-links">
-                  <button
-                    type="button"
-                    className="auth-link-btn-telegram"
-                    onClick={() => {
-                      setLoginMethod("phone");
-                      setStep("phone");
-                      setError("");
-                    }}
-                  >
-                    LOG IN BY PHONE NUMBER
-                  </button>
                   <button
                     type="button"
                     className="auth-link-btn-telegram"
@@ -762,6 +843,86 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
                       setStep(loginMethod === "email" ? "email" : "phone");
                       setError("");
                     }}
+                  >
+                    CANCEL
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {step === "complete-profile" && (
+              <form onSubmit={handleProfileCompletionSubmit} className="auth-form">
+                <div className="auth-logo-section">
+                  <div className="auth-logo-circle">
+                    <FontAwesomeIcon icon={faFire} className="auth-logo-icon" />
+                  </div>
+                  <h1 className="auth-brand-name">Complete Your Profile</h1>
+                  <p className="auth-brand-tagline">
+                    Please fill in your details to get started with Fire Talk.
+                  </p>
+                </div>
+
+                <div className="auth-input-group">
+                  <span className="auth-input-label">First Name *</span>
+                  <input
+                    type="text"
+                    className="auth-input"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="John"
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                <div className="auth-input-group">
+                  <span className="auth-input-label">Last Name (optional)</span>
+                  <input
+                    type="text"
+                    className="auth-input"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    placeholder="Doe"
+                  />
+                </div>
+
+                <div className="auth-input-group">
+                  <span className="auth-input-label">Nickname *</span>
+                  <input
+                    type="text"
+                    className="auth-input"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="your_nickname"
+                    required
+                    minLength={5}
+                    maxLength={32}
+                  />
+                  <span className="auth-input-hint" style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>5–32 characters</span>
+                </div>
+
+                <div className="auth-input-group">
+                  <span className="auth-input-label">Bio (optional)</span>
+                  <input
+                    type="text"
+                    className="auth-input"
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    placeholder="A few words about yourself"
+                    maxLength={70}
+                  />
+                  <span className="auth-input-hint" style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>{bio.length}/70</span>
+                </div>
+
+                <button type="submit" className="auth-submit-btn">
+                  START MESSAGING
+                </button>
+
+                <div className="auth-bottom-links">
+                  <button
+                    type="button"
+                    className="auth-link-btn-telegram"
+                    onClick={handleCancelProfileCompletion}
                   >
                     CANCEL
                   </button>

@@ -537,6 +537,8 @@ router.post("/clerk", async (req, res, next) => {
       user = await User.findOne({ email });
     }
 
+    let isNewUser = false;
+
     if (user) {
       // Update existing user with Clerk ID if not already linked
       let hasChanges = false;
@@ -553,6 +555,7 @@ router.post("/clerk", async (req, res, next) => {
       }
     } else {
       // Create new user in local MongoDB
+      isNewUser = true;
       user = await User.create({
         clerkId: userId,
         email: email || undefined,
@@ -571,6 +574,7 @@ router.post("/clerk", async (req, res, next) => {
 
     res.json({
       success: true,
+      isNewUser,
       user: {
         id: user._id,
         email: user.email,
@@ -578,6 +582,7 @@ router.post("/clerk", async (req, res, next) => {
         firstName: user.firstName,
         lastName: user.lastName,
         username: user.username,
+        bio: user.bio || "",
         avatar: user.avatar,
       },
       accessToken,
