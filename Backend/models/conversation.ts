@@ -35,6 +35,7 @@ conversationSchema.pre("validate", function (this: any) {
   }
 });
 
-conversationSchema.index({ participants: 1 }, { unique: true });
+conversationSchema.index({ "participants.0": 1, "participants.1": 1 }, { unique: true });
 
 export default mongoose.model("Conversation", conversationSchema);
+

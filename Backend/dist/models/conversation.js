@@ -31,5 +31,5 @@ conversationSchema.pre("validate", function () {
         this.participants.sort((a, b) => String(a).localeCompare(String(b)));
     }
 });
-conversationSchema.index({ participants: 1 }, { unique: true });
+conversationSchema.index({ "participants.0": 1, "participants.1": 1 }, { unique: true });
 exports.default = mongoose_1.default.model("Conversation", conversationSchema);
