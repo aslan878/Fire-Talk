@@ -7,6 +7,8 @@ import type {
 } from "../data/types";
 import { useState, useRef, useEffect } from "react";
 import { api } from "../services/api";
+import { EmojiPicker } from "./EmojiPicker";
+import { VoicePlayer } from "./VoicePlayer";
 import {
   SearchIcon,
   PinIcon,
@@ -14,7 +16,6 @@ import {
   VideoIcon,
   MoreIcon,
   PaperclipIcon,
-  GiftIcon,
   SmileIcon,
   MicIcon,
   SendIcon,
@@ -155,7 +156,131 @@ export const MainChat: React.FC<MainChatProps> = ({
   const [pinnedPreviewDismissed, setPinnedPreviewDismissed] = useState(false);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingIntervalRef = useRef<any>(null);
+
   const chatId = activeChat.id || "";
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      
+      let options = {};
+      if (MediaRecorder.isTypeSupported("audio/webm")) {
+        options = { mimeType: "audio/webm" };
+      } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+        options = { mimeType: "audio/mp4" };
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, options);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+
+      recordingIntervalRef.current = window.setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error("Failed to start voice recording:", err);
+      window.alert("Could not access microphone. Please allow microphone access.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (!mediaRecorderRef.current || !isRecording) return;
+    const recorder = mediaRecorderRef.current;
+    
+    if (recordingIntervalRef.current) {
+      window.clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
+
+    recorder.onstop = () => {
+      const audioBlob = new Blob(audioChunksRef.current, { 
+        type: recorder.mimeType || "audio/webm" 
+      });
+
+      if (recorder.stream) {
+        recorder.stream.getTracks().forEach((track) => track.stop());
+      }
+
+      if (audioBlob.size > 0 && onSendMessage && !isGuest) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64Url = reader.result as string;
+          onSendMessage({
+            kind: "voice",
+            text: "Voice message",
+            attachment: {
+              url: base64Url,
+              mimeType: audioBlob.type,
+              fileName: `voice-${Date.now()}.${audioBlob.type.split(";")[0].split("/")[1] || "webm"}`,
+              size: audioBlob.size,
+              durationSec: recordingTime,
+            },
+          });
+        };
+        reader.readAsDataURL(audioBlob);
+      }
+
+      setIsRecording(false);
+      setRecordingTime(0);
+    };
+
+    recorder.stop();
+  };
+
+  const cancelRecording = () => {
+    if (!mediaRecorderRef.current || !isRecording) return;
+    const recorder = mediaRecorderRef.current;
+
+    if (recordingIntervalRef.current) {
+      window.clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
+
+    recorder.onstop = () => {
+      if (recorder.stream) {
+        recorder.stream.getTracks().forEach((track) => track.stop());
+      }
+      setIsRecording(false);
+      setRecordingTime(0);
+      audioChunksRef.current = [];
+    };
+
+    recorder.stop();
+  };
+
+  // Clean up recording state on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingIntervalRef.current) {
+        window.clearInterval(recordingIntervalRef.current);
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
+    };
+  }, []);
+
+  const formatRecordingTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s < 10 ? "0" : ""}${s}`;
+  };
 
   const handleReact = async (messageId: string, emoji: string) => {
     if (!onReactToMessage) return;
@@ -447,6 +572,16 @@ export const MainChat: React.FC<MainChatProps> = ({
   };
 
   const renderMessageBody = (msg: Message, highlightQuery = "") => {
+    if (msg.kind === "voice" && msg.attachment?.url) {
+      return (
+        <VoicePlayer
+          url={msg.attachment.url}
+          durationSec={msg.attachment.durationSec}
+          isOwn={msg.isOwn}
+        />
+      );
+    }
+
     if ((msg.kind === "image" || msg.kind === "video") && msg.attachment?.url) {
       return (
         <div className="message-attachment">
@@ -1359,59 +1494,126 @@ export const MainChat: React.FC<MainChatProps> = ({
             )}
           </div>
         )}
-        <div
-          className={`message-input-container ${isGuest ? "guest-disabled" : ""}`}
-        >
-          <button
-            ref={buttonRef}
-            className="paperclip"
-            onClick={() => !isGuest && setIsClipOpen(!isClipOpen)}
-            disabled={isGuest}
-          >
-            <PaperclipIcon />
-          </button>
-
-          <input
-            type="text"
-            className="message-input"
-            placeholder={
-              isGuest
-                ? "You are in Guest Mode (Read-Only)"
-                : messageInputPlaceholder || ""
-            }
-            disabled={isGuest}
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !isGuest && inputText.trim()) {
-                submitTextMessage();
-              }
+        {!isGuest && isEmojiPickerOpen && (
+          <EmojiPicker
+            onSelectEmoji={(emoji) => {
+              setInputText((prev) => prev + emoji);
             }}
+            onClose={() => setIsEmojiPickerOpen(false)}
           />
-          <div className="input-actions">
-            <GiftIcon />
-            <SmileIcon />
-            <MicIcon />
+        )}
+        {!isGuest && isRecording ? (
+          <div className="voice-recording-container">
+            <div className="voice-recording-info">
+              <span className="voice-recording-dot"></span>
+              <span className="voice-recording-timer">{formatRecordingTime(recordingTime)}</span>
+              <span className="voice-recording-label">Запись голосового сообщения...</span>
+            </div>
+            <div className="voice-recording-actions">
+              <button
+                type="button"
+                className="voice-recording-cancel-btn"
+                onClick={cancelRecording}
+                title="Отменить"
+              >
+                <FontAwesomeIcon icon={faTrash} /> Отмена
+              </button>
+              <button
+                type="button"
+                className="voice-recording-send-btn"
+                onClick={stopRecording}
+                title="Отправить"
+              >
+                <FontAwesomeIcon icon={faCircleCheck} /> Отправить
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div
+            className={`message-input-container ${isGuest ? "guest-disabled" : ""}`}
+          >
             <button
-              className="send-btn"
-              onClick={() => {
-                submitTextMessage();
-              }}
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "inherit",
-                padding: 0,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-              }}
+              ref={buttonRef}
+              className="paperclip"
+              onClick={() => !isGuest && setIsClipOpen(!isClipOpen)}
               disabled={isGuest}
             >
-              <SendIcon />
+              <PaperclipIcon />
             </button>
+
+            <input
+              type="text"
+              className="message-input"
+              placeholder={
+                isGuest
+                  ? "You are in Guest Mode (Read-Only)"
+                  : messageInputPlaceholder || ""
+              }
+              disabled={isGuest}
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !isGuest && inputText.trim()) {
+                  submitTextMessage();
+                }
+              }}
+            />
+            <div className="input-actions">
+              <button
+                type="button"
+                onClick={() => !isGuest && setIsEmojiPickerOpen(!isEmojiPickerOpen)}
+                disabled={isGuest}
+                title="Выбрать эмодзи"
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "inherit",
+                  padding: 0,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center"
+                }}
+              >
+                <SmileIcon />
+              </button>
+              <button
+                type="button"
+                onClick={() => !isGuest && startRecording()}
+                disabled={isGuest}
+                title="Записать голосовое сообщение"
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "inherit",
+                  padding: 0,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center"
+                }}
+              >
+                <MicIcon />
+              </button>
+              <button
+                className="send-btn"
+                onClick={() => {
+                  submitTextMessage();
+                }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "inherit",
+                  padding: 0,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                }}
+                disabled={isGuest}
+              >
+                <SendIcon />
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </main>
   );
