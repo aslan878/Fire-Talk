@@ -120,6 +120,51 @@ const getMessagePreview = (message: {
   return message.text || "Message";
 };
 
+// Helper to synthesize a premium message notification sound
+const playNotificationSound = () => {
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const now = audioCtx.currentTime;
+    
+    // Premium soft double-beep
+    const osc1 = audioCtx.createOscillator();
+    const gain1 = audioCtx.createGain();
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(587.33, now); // D5
+    gain1.gain.setValueAtTime(0.08, now);
+    gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+    osc1.connect(gain1);
+    gain1.connect(audioCtx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.08);
+    
+    const osc2 = audioCtx.createOscillator();
+    const gain2 = audioCtx.createGain();
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(880, now + 0.08); // A5
+    gain2.gain.setValueAtTime(0.08, now + 0.08);
+    gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+    osc2.connect(gain2);
+    gain2.connect(audioCtx.destination);
+    osc2.start(now + 0.08);
+    osc2.stop(now + 0.22);
+  } catch (error) {
+    console.error("Failed to play notification sound:", error);
+  }
+};
+
+// Helper to show a Desktop Notification
+const showNotification = (title: string, options?: any) => {
+  if ("Notification" in window && Notification.permission === "granted") {
+    try {
+      new Notification(title, options);
+    } catch (e) {
+      console.error("Failed to show browser notification:", e);
+    }
+  }
+};
+
+
 interface LayoutProps {
   currentUserData: CurrentUserData;
   activeChat: any;
@@ -253,6 +298,25 @@ function App() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // Request browser notification permission on login
+  useEffect(() => {
+    if (currentUserData && "Notification" in window) {
+      if (Notification.permission === "default") {
+        Notification.requestPermission();
+      }
+    }
+  }, [currentUserData]);
+
+  // Update browser tab title with unread count
+  useEffect(() => {
+    const totalUnread = chats.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
+    if (totalUnread > 0) {
+      document.title = `(${totalUnread}) FireTalk`;
+    } else {
+      document.title = "FireTalk";
+    }
+  }, [chats]);
 
   const activeChatRef = useRef(activeChat);
   const isMobileRef = useRef(isMobile);
@@ -441,10 +505,14 @@ function App() {
         });
       }
 
-      // 2. Update last message in the sidebar
+      // 2. Update last message and unread count in the sidebar
+      const isOwnMessage = msg.sender._id === currentUserData.id;
+      const isCurrentChat = activeChatRef.current && messageChatId === String(activeChatRef.current.id);
+
       setChats((prev) =>
         prev.map((c) => {
           if (c.id === messageChatId) {
+            const extraUnread = (!isCurrentChat && !isOwnMessage) ? 1 : 0;
             return {
               ...c,
               lastMessage: getMessagePreview(msg),
@@ -452,11 +520,28 @@ function App() {
                 hour: "2-digit",
                 minute: "2-digit",
               }),
+              unreadCount: (c.unreadCount || 0) + extraUnread,
             };
           }
           return c;
         }),
       );
+
+      // Play sound and show desktop notification for incoming messages from others
+      if (!isOwnMessage) {
+        playNotificationSound();
+
+        const isWindowHidden = document.hidden || !document.hasFocus();
+        if (!isCurrentChat || isWindowHidden) {
+          const senderName = `${msg.sender.firstName} ${msg.sender.lastName || ""}`.trim();
+          const bodyText = getMessagePreview(msg);
+          showNotification(senderName, {
+            body: bodyText,
+            tag: messageChatId,
+            renotify: true,
+          });
+        }
+      }
     });
 
     // Listen for poll updates
@@ -564,10 +649,12 @@ function App() {
   }, [activeChat]);
 
   const loadChats = useCallback(
-    async (selectChatId?: string) => {
+    async (selectChatId?: string, silent = false) => {
       if (!currentUserData) return;
       try {
-        setChatsLoading(true);
+        if (!silent) {
+          setChatsLoading(true);
+        }
         // Single request instead of 3 separate ones
         const { conversations, groups, channels } =
           await api.chats.getAllChats();
@@ -642,7 +729,16 @@ function App() {
           })),
         ];
 
-        setChats(formattedChats);
+        setChats((prevChats) => {
+          return formattedChats.map((newChat) => {
+            const prevChat = prevChats.find((pc) => pc.id === newChat.id);
+            const unreadCount = prevChat ? prevChat.unreadCount || 0 : 0;
+            return {
+              ...newChat,
+              unreadCount: activeChatRef.current?.id === newChat.id ? 0 : unreadCount,
+            };
+          });
+        });
 
         if (selectChatId) {
           const found = formattedChats.find((c) => c.id === selectChatId);
@@ -672,6 +768,15 @@ function App() {
       setMessages([]);
     }
   }, [currentUserData, loadChats]);
+
+  const handleSelectChat = useCallback((chat: any) => {
+    setActiveChat(chat);
+    setChats((prevChats) =>
+      prevChats.map((c) =>
+        c.id === chat.id ? { ...c, unreadCount: 0 } : c
+      )
+    );
+  }, []);
 
   // Track current chat to prevent race conditions on fast switching
   const loadingChatIdRef = useRef<string | null>(null);
@@ -1124,9 +1229,9 @@ function App() {
                     isActive: activeChat?.id === c.id,
                   }))}
                   onLogout={handleLogout}
-                  onSelectChat={(chat) => setActiveChat(chat)}
+                  onSelectChat={handleSelectChat}
                   onTabChange={(tabId) => setActiveTab(tabId)}
-                  onChatCreated={loadChats}
+                  onChatCreated={(chatId) => loadChats(chatId, true)}
                 />
               </MainLayout>
             ) : (
@@ -1168,7 +1273,7 @@ function App() {
           element={
             <GroupInviteRoute
               currentUserData={currentUserData}
-              onJoined={loadChats}
+              onJoined={(chatId) => loadChats(chatId, true)}
             />
           }
         />
