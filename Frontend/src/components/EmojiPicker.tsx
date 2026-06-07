@@ -37,14 +37,14 @@ const EMOJI_CATEGORIES: EmojiCategory[] = [
     name: "Animals & Nature",
     icon: "🐱",
     emojis: [
-      "🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮", "🐷", "🐽", "🐸", "🐵", "🙈", "🙉", "🙊", "🐒", "🐔", "🐧", "🐦", "🐤", "🐣", "🐥", "🦆", "🦅", "🦉", "🦇", "🐺", "🐗", "🐴", "🦄", "🐝", "🪱", "🐛", "🦋", "🐌", "🐞", "🐜", "🦟", "🦗", "🕷️", "🕸️", "🦂", "🐢", "🐍", "🦎", "🐙", "🦑", "🦞", "🦀", "🐡", "🐠", "🐟", "🐬", "🐳", "🐋", "🦈", "🐊", "🐅", "🐆", "🦓", "🦍", "🦧", "🦣", "🐘", "🦛", "🦏", "🐪", "🐫", "🦒", "🦘", "🦬", "🐃", "🐂", "🐄", "🐎", "🐖", "🐏", "🐑", "🦙", "🐐", "🦌", "🐕", "🐈", "🍀", "🌸", "🌹", "🌺", "🌻", "🍁", "🍁", "🍂", "🌵", "🎄", "🌲", "🌳", "🌴", "🌱", "🌿", "🌾", "🍃", "🍄", "Chestnut"
+      "🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮", "🐷", "🐽", "🐸", "🐵", "🙈", "🙉", "🙊", "🐒", "🐔", "🐧", "🐦", "🐤", "🐣", "🐥", "🦆", "🦅", "🦉", "🦇", "🐺", "🐗", "🐴", "🦄", "🐝", "🪱", "🐛", "🦋", "🐌", "🐞", "🐜", "🦟", "🦗", "🕷️", "🕸️", "🦂", "🐢", "🐍", "🦎", "🐙", "🦑", "🦞", "🦀", "🐡", "🐠", "🐟", "🐬", "🐳", "🐋", "🦈", "🐊", "🐅", "🐆", "🦓", "🦍", "🦧", "🦣", "🐘", "🦛", "🦏", "🐪", "🐫", "🦒", "🦘", "🦬", "🐃", "🐂", "🐄", "🐎", "🐖", "🐏", "🐑", "🦙", "🐐", "🦌", "🐕", "🐈", "🍀", "🌸", "🌹", "🌺", "🌻", "🍁", "🍁", "🍂", "🌵", "🎄", "🌲", "🌳", "🌴", "🌱", "🌿", "🌾", "🍃", "🍄"
     ]
   },
   {
     name: "Food & Drink",
     icon: "🍔",
     emojis: [
-      "🍎", "🍐", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🫐", "🍒", "🍑", "🥭", "🍍", "🥥", "🥝", "🍅", "🍆", "🥑", "🥦", "🥬", "🥒", "🌶️", "🫑", "🌽", "🥕", "🧄", "🧅", "🥔", "🍠", "🥐", "🥯", "🍞", "🥖", "🥨", "🧀", "🥚", "🍳", "🧈", "🥞", " waffle", "🥓", "🥩", "🍗", "🍖", "🌭", "🍔", "🍟", "🍕", "🥪", "🌮", "🌯", "🥗", "🥘", "🍲", "🫕", "🥫", "🍝", "🍜", "🍣", "🍤", "🍢", "🍙", "🍚", "🍛", "🍡", " dumpling", "🍮", "🎂", "🍰", "🧁", "🥧", "🍫", "🍬", "🍭", "🍩", "🍪", "🍿", "🍯", "🥛", "☕", "🍵", "🥤", "🧋", "🍺", "🍻", "🥂", "🍷", "🥃", "🍸", "🍹", "🍾", "🧊"
+      "🍎", "🍐", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🫐", "🍒", "🍑", "🥭", "🍍", "🥥", "🥝", "🍅", "🍆", "🥑", "🥦", "🥬", "🥒", "🌶️", "🫑", "🌽", "🥕", "🧄", "🧅", "🥔", "🍠", "🥐", "🥯", "🍞", "🥖", "🥨", "🧀", "🥚", "🍳", "🧈", "🥞", "🥓", "🥩", "🍗", "🍖", "🌭", "🍔", "🍟", "🍕", "🥪", "🌮", "🌯", "🥗", "🥘", "🍲", "🫕", "🥫", "🍝", "🍜", "🍣", "🍤", "🍢", "🍙", "🍚", "🍛", "🍡", "🍮", "🎂", "🍰", "🧁", "🥧", "🍫", "🍬", "🍭", "🍩", "🍪", "🍿", "🍯", "🥛", "☕", "🍵", "🥤", "🧋", "🍺", "🍻", "🥂", "🍷", "🥃", "🍸", "🍹", "🍾", "🧊"
     ]
   },
   {
@@ -65,7 +65,12 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelectEmoji, onClose
   // Close picker on outside click
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+      const target = e.target as HTMLElement | null;
+      if (
+        pickerRef.current &&
+        !pickerRef.current.contains(target) &&
+        !target?.closest(".emoji-picker-toggle-btn")
+      ) {
         onClose();
       }
     };
@@ -77,7 +82,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelectEmoji, onClose
   const filteredEmojis = useMemo(() => {
     if (!searchQuery.trim()) return null;
     const q = searchQuery.toLowerCase();
-    
+
     // We don't have descriptive names for each emoji, but we can return all matching emojis
     // or just return emojis from categories if we match category names, 
     // or we can search through a flat list of emojis.
@@ -109,7 +114,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelectEmoji, onClose
       "cat": "🐱🐈🐈‍⬛😸😹😻😼😽🙀😿😾",
       "dog": "🐶🐕🐩🦮🐕‍🦺",
       "star": "⭐🌟💫✨🌠",
-      "food": "🍎🍊🍋🍌🍉🍇🍓🍔🍟🍕🥪🌮🌯 Salad Sushi Cake Cookie ☕🍺🍷 коктейль",
+      "food": "🍎🍊🍋🍌🍉🍇🍓🍔🍟🍕🥪🌮🌯 Salad Sushi Cake Cookie ☕🍺🍷 cocktail",
       "drink": "☕🍵🥤🧋🍺🍻🥂🍷🥃🍸🍹🍾🧊",
       "beer": "🍺🍻",
       "coffee": "☕",
@@ -129,14 +134,14 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelectEmoji, onClose
       }
       return false;
     });
-    
+
     return matches.length > 0 ? matches : allEmojis.slice(0, 40); // fallback to first 40 if no match
   }, [searchQuery]);
 
   const handleTabClick = (index: number) => {
     setActiveTab(index);
     setSearchQuery(""); // clear search when switching tabs
-    
+
     // Scroll category into view
     const categoryEl = categoriesRef.current?.children[index] as HTMLElement;
     if (categoryEl) {
@@ -146,17 +151,6 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelectEmoji, onClose
 
   return (
     <div className="emoji-picker-popover" ref={pickerRef}>
-      <div className="emoji-picker-search-container">
-        <input
-          type="text"
-          placeholder="Поиск эмодзи..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="emoji-picker-search-input"
-          autoFocus
-        />
-      </div>
-
       {!searchQuery && (
         <div className="emoji-picker-tabs">
           {EMOJI_CATEGORIES.map((cat, idx) => (
@@ -176,7 +170,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelectEmoji, onClose
       <div className="emoji-picker-content" ref={categoriesRef}>
         {searchQuery ? (
           <div className="emoji-picker-grid-wrapper">
-            <div className="emoji-picker-category-title">Результаты поиска</div>
+            <div className="emoji-picker-category-title">Search Results</div>
             <div className="emoji-picker-grid">
               {filteredEmojis?.map((emoji, idx) => (
                 <button

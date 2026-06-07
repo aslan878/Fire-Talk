@@ -84,6 +84,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   const [contactQuery, setContactQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [sidebarSearchQuery, setSidebarSearchQuery] = useState("");
 
   const menuRef = useRef<HTMLDivElement>(null);
   const addRef = useRef<HTMLDivElement>(null);
@@ -382,6 +383,8 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                 type="text"
                 className="search-input"
                 placeholder={searchPlaceholder}
+                value={sidebarSearchQuery}
+                onChange={(e) => setSidebarSearchQuery(e.target.value)}
               />
             </div>
 
@@ -414,20 +417,34 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
               </div>
             )}
 
-            {chats.length === 0 ? (
-              <div
-                style={{
-                  padding: "40px 20px",
-                  textAlign: "center",
-                  color: "var(--text-muted)",
-                  fontSize: "14px",
-                }}
-              >
-                No chats here. Click the "+" icon to create a channel, group, or
-                add a contact!
-              </div>
-            ) : (
-              chats.map((chat) => (
+            {(() => {
+              const filteredChats = chats.filter((chat) => {
+                const q = sidebarSearchQuery.toLowerCase().trim();
+                if (!q) return true;
+                return (
+                  chat.name.toLowerCase().includes(q) ||
+                  (chat.lastMessage && chat.lastMessage.toLowerCase().includes(q))
+                );
+              });
+
+              if (filteredChats.length === 0) {
+                return (
+                  <div
+                    style={{
+                      padding: "40px 20px",
+                      textAlign: "center",
+                      color: "var(--text-muted)",
+                      fontSize: "14px",
+                    }}
+                  >
+                    {sidebarSearchQuery.trim()
+                      ? "No matching chats found"
+                      : "No chats here. Click the \"+\" icon to create a channel, group, or add a contact!"}
+                  </div>
+                );
+              }
+
+              return filteredChats.map((chat) => (
                 <div
                   key={chat.id}
                   className={`chat-item ${chat.isActive ? "active" : ""}`}
@@ -464,8 +481,8 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                     <div className="unread-badge">{chat.unreadCount}</div>
                   ) : null}
                 </div>
-              ))
-            )}
+              ));
+            })()}
           </div>
         </>
       )}

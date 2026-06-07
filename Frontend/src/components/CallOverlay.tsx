@@ -49,14 +49,14 @@ export function CallOverlay({
 }: CallOverlayProps) {
   if (callState === "idle" && !callError) return null;
 
-  const typeText = callType === "video" ? "Видео" : "Аудио";
+  const typeText = callType === "video" ? "Video" : "Audio";
   const statusText =
     callState === "outgoing"
-      ? `${typeText}вызов...`
+      ? `${typeText} call...`
       : callState === "incoming"
-        ? `Входящий ${typeText.toLowerCase()}звонок`
+        ? `Incoming ${typeText.toLowerCase()} call`
         : callState === "connecting"
-          ? "Подключение..."
+          ? "Connecting..."
           : callState === "connected"
             ? formatCallDuration(callDuration)
             : "";
@@ -101,7 +101,7 @@ export function CallOverlay({
                 />
                 {!isVideoEnabled && (
                   <div className="video-local-placeholder">
-                    <span>Камера выключена</span>
+                    <span>Camera off</span>
                   </div>
                 )}
               </div>
@@ -116,7 +116,7 @@ export function CallOverlay({
                     type="button"
                     className={`call-btn call-btn--mute ${isMuted ? "active" : ""}`}
                     onClick={onToggleMute}
-                    aria-label={isMuted ? "Включить микрофон" : "Выключить микрофон"}
+                    aria-label={isMuted ? "Unmute microphone" : "Mute microphone"}
                   >
                     <FontAwesomeIcon icon={isMuted ? faMicrophoneSlash : faMicrophone} />
                   </button>
@@ -124,7 +124,7 @@ export function CallOverlay({
                     type="button"
                     className={`call-btn call-btn--video ${!isVideoEnabled ? "active" : ""}`}
                     onClick={onToggleVideo}
-                    aria-label={isVideoEnabled ? "Выключить камеру" : "Включить камеру"}
+                    aria-label={isVideoEnabled ? "Turn off camera" : "Turn on camera"}
                   >
                     <FontAwesomeIcon icon={isVideoEnabled ? faVideo : faVideoSlash} />
                   </button>
@@ -132,7 +132,7 @@ export function CallOverlay({
                     type="button"
                     className="call-btn call-btn--end"
                     onClick={onEnd}
-                    aria-label="Завершить звонок"
+                    aria-label="End call"
                   >
                     <FontAwesomeIcon icon={faPhoneSlash} />
                   </button>
@@ -155,7 +155,7 @@ export function CallOverlay({
                       type="button"
                       className="call-btn call-btn--accept"
                       onClick={onAccept}
-                      aria-label="Принять"
+                      aria-label="Accept"
                     >
                       <FontAwesomeIcon icon={faPhone} />
                     </button>
@@ -163,7 +163,7 @@ export function CallOverlay({
                       type="button"
                       className="call-btn call-btn--reject"
                       onClick={onReject}
-                      aria-label="Отклонить"
+                      aria-label="Decline"
                     >
                       <FontAwesomeIcon icon={faPhoneSlash} />
                     </button>
@@ -175,7 +175,7 @@ export function CallOverlay({
                     type="button"
                     className="call-btn call-btn--end"
                     onClick={onEnd}
-                    aria-label="Отменить"
+                    aria-label="Cancel"
                   >
                     <FontAwesomeIcon icon={faPhoneSlash} />
                   </button>
@@ -187,7 +187,7 @@ export function CallOverlay({
                       type="button"
                       className={`call-btn call-btn--mute ${isMuted ? "active" : ""}`}
                       onClick={onToggleMute}
-                      aria-label={isMuted ? "Включить микрофон" : "Выключить микрофон"}
+                      aria-label={isMuted ? "Unmute microphone" : "Mute microphone"}
                     >
                       <FontAwesomeIcon
                         icon={isMuted ? faMicrophoneSlash : faMicrophone}
@@ -197,7 +197,7 @@ export function CallOverlay({
                       type="button"
                       className="call-btn call-btn--end"
                       onClick={onEnd}
-                      aria-label="Завершить"
+                      aria-label="End call"
                     >
                       <FontAwesomeIcon icon={faPhoneSlash} />
                     </button>

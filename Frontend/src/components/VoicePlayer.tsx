@@ -14,8 +14,11 @@ export const VoicePlayer: React.FC<VoicePlayerProps> = ({ url, durationSec, isOw
   const [duration, setDuration] = useState(durationSec || 0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressRef = useRef<HTMLInputElement>(null);
+  const audioCleanupRef = useRef<(() => void) | null>(null);
 
-  useEffect(() => {
+  const initAudio = () => {
+    if (audioRef.current) return audioRef.current;
+
     const audio = new Audio(url);
     audioRef.current = audio;
 
@@ -44,12 +47,7 @@ export const VoicePlayer: React.FC<VoicePlayerProps> = ({ url, durationSec, isOw
     audio.addEventListener("loadedmetadata", handleLoadedMetadata);
     audio.addEventListener("ended", handleEnded);
 
-    // Initial load to trigger metadata loading if duration is missing
-    if (!durationSec) {
-      audio.load();
-    }
-
-    return () => {
+    audioCleanupRef.current = () => {
       audio.pause();
       audio.removeEventListener("play", handlePlay);
       audio.removeEventListener("pause", handlePause);
@@ -58,23 +56,45 @@ export const VoicePlayer: React.FC<VoicePlayerProps> = ({ url, durationSec, isOw
       audio.removeEventListener("ended", handleEnded);
       audioRef.current = null;
     };
+
+    return audio;
+  };
+
+  useEffect(() => {
+    // Reset player states and clean up old audio if URL changes
+    setCurrentTime(0);
+    setDuration(durationSec || 0);
+    setIsPlaying(false);
+    if (audioCleanupRef.current) {
+      audioCleanupRef.current();
+      audioCleanupRef.current = null;
+    }
   }, [url, durationSec]);
 
+  // Clean up on component unmount
+  useEffect(() => {
+    return () => {
+      if (audioCleanupRef.current) {
+        audioCleanupRef.current();
+      }
+    };
+  }, []);
+
   const togglePlayback = () => {
-    if (!audioRef.current) return;
+    const audio = initAudio();
     if (isPlaying) {
-      audioRef.current.pause();
+      audio.pause();
     } else {
-      audioRef.current.play().catch(err => {
+      audio.play().catch(err => {
         console.error("Audio playback error:", err);
       });
     }
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!audioRef.current) return;
+    const audio = initAudio();
     const value = parseFloat(e.target.value);
-    audioRef.current.currentTime = value;
+    audio.currentTime = value;
     setCurrentTime(value);
   };
 

@@ -159,17 +159,34 @@ export const MainChat: React.FC<MainChatProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const [audioLevels, setAudioLevels] = useState<number[]>(new Array(24).fill(0));
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingIntervalRef = useRef<any>(null);
 
+  const isLockedRef = useRef(false);
+  const shouldStopRecordingRef = useRef(false);
+  const shouldCancelRecordingRef = useRef(false);
+  const startXRef = useRef(0);
+  const recordingStartRef = useRef(0);
+  const isCancelledRef = useRef(false);
   const chatId = activeChat.id || "";
+
+  // Web Audio API refs for real-time audio level analysis
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animFrameRef = useRef<number>(0);
+  const NUM_BARS = 24;
 
   const startRecording = async () => {
     try {
+      shouldStopRecordingRef.current = false;
+      shouldCancelRecordingRef.current = false;
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
-      
+
       let options = {};
       if (MediaRecorder.isTypeSupported("audio/webm")) {
         options = { mimeType: "audio/webm" };
@@ -193,24 +210,84 @@ export const MainChat: React.FC<MainChatProps> = ({
       recordingIntervalRef.current = window.setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
+
+      // Set up Web Audio API analyser for real-time audio levels
+      try {
+        const audioCtx = new AudioContext();
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 64;
+        analyser.smoothingTimeConstant = 0.6;
+        source.connect(analyser);
+        audioContextRef.current = audioCtx;
+        analyserRef.current = analyser;
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        const updateLevels = () => {
+          if (!analyserRef.current) return;
+          analyserRef.current.getByteFrequencyData(dataArray);
+
+          // Map frequency bins to our bars count
+          const bars: number[] = [];
+          const binCount = dataArray.length;
+          const binsPerBar = Math.max(1, Math.floor(binCount / NUM_BARS));
+          for (let i = 0; i < NUM_BARS; i++) {
+            let sum = 0;
+            for (let j = 0; j < binsPerBar; j++) {
+              const idx = i * binsPerBar + j;
+              sum += idx < binCount ? dataArray[idx] : 0;
+            }
+            // Normalize to 0-1 range with a slight boost
+            bars.push(Math.min(1, (sum / binsPerBar / 255) * 1.4));
+          }
+          setAudioLevels(bars);
+          animFrameRef.current = requestAnimationFrame(updateLevels);
+        };
+        animFrameRef.current = requestAnimationFrame(updateLevels);
+      } catch (audioErr) {
+        console.warn("Could not set up audio analyser:", audioErr);
+      }
+
+      // Check if user already cancelled/stopped during permission prompt
+      if (shouldCancelRecordingRef.current) {
+        cancelRecording();
+      } else if (shouldStopRecordingRef.current) {
+        stopRecording();
+      }
     } catch (err) {
       console.error("Failed to start voice recording:", err);
       window.alert("Could not access microphone. Please allow microphone access.");
+      setIsRecording(false);
+      setIsLocked(false);
+      isLockedRef.current = false;
     }
   };
 
   const stopRecording = () => {
-    if (!mediaRecorderRef.current || !isRecording) return;
+    if (!mediaRecorderRef.current || !isRecording) {
+      shouldStopRecordingRef.current = true;
+      return;
+    }
     const recorder = mediaRecorderRef.current;
-    
+
     if (recordingIntervalRef.current) {
       window.clearInterval(recordingIntervalRef.current);
       recordingIntervalRef.current = null;
     }
 
+    // Clean up audio analyser
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => { });
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+    setAudioLevels(new Array(NUM_BARS).fill(0));
+
     recorder.onstop = () => {
-      const audioBlob = new Blob(audioChunksRef.current, { 
-        type: recorder.mimeType || "audio/webm" 
+      const audioBlob = new Blob(audioChunksRef.current, {
+        type: recorder.mimeType || "audio/webm"
       });
 
       if (recorder.stream) {
@@ -238,13 +315,18 @@ export const MainChat: React.FC<MainChatProps> = ({
 
       setIsRecording(false);
       setRecordingTime(0);
+      setIsLocked(false);
+      isLockedRef.current = false;
     };
 
     recorder.stop();
   };
 
   const cancelRecording = () => {
-    if (!mediaRecorderRef.current || !isRecording) return;
+    if (!mediaRecorderRef.current || !isRecording) {
+      shouldCancelRecordingRef.current = true;
+      return;
+    }
     const recorder = mediaRecorderRef.current;
 
     if (recordingIntervalRef.current) {
@@ -252,16 +334,81 @@ export const MainChat: React.FC<MainChatProps> = ({
       recordingIntervalRef.current = null;
     }
 
+    // Clean up audio analyser
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => { });
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+    setAudioLevels(new Array(NUM_BARS).fill(0));
+
     recorder.onstop = () => {
       if (recorder.stream) {
         recorder.stream.getTracks().forEach((track) => track.stop());
       }
       setIsRecording(false);
       setRecordingTime(0);
+      setIsLocked(false);
+      isLockedRef.current = false;
       audioChunksRef.current = [];
     };
 
     recorder.stop();
+  };
+
+  const handleMicStart = (e: React.MouseEvent | React.TouchEvent) => {
+    if (isGuest) return;
+    e.preventDefault();
+
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    startXRef.current = clientX;
+    recordingStartRef.current = Date.now();
+    isLockedRef.current = false;
+    isCancelledRef.current = false;
+    setIsLocked(false);
+
+    void startRecording();
+
+    const handleRelease = (_ev: MouseEvent | TouchEvent) => {
+      window.removeEventListener("mouseup", handleRelease);
+      window.removeEventListener("touchend", handleRelease);
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("touchmove", handleMove);
+
+      if (isCancelledRef.current) return;
+
+      const elapsed = Date.now() - recordingStartRef.current;
+      if (elapsed < 350) {
+        // Short click: Lock mode (stay recording)
+        isLockedRef.current = true;
+        setIsLocked(true);
+      } else {
+        // Long press release: stop and send
+        stopRecording();
+      }
+    };
+
+    const handleMove = (ev: MouseEvent | TouchEvent) => {
+      if (isLockedRef.current || isCancelledRef.current) return;
+      const currentX = "touches" in ev ? ev.touches[0].clientX : ev.clientX;
+      const deltaX = currentX - startXRef.current;
+
+      // Swipe left by 80px or more to cancel
+      if (deltaX < -80) {
+        isCancelledRef.current = true;
+        cancelRecording();
+        window.removeEventListener("mouseup", handleRelease);
+        window.removeEventListener("touchend", handleRelease);
+        window.removeEventListener("mousemove", handleMove);
+        window.removeEventListener("touchmove", handleMove);
+      }
+    };
+
+    window.addEventListener("mouseup", handleRelease);
+    window.addEventListener("touchend", handleRelease);
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("touchmove", handleMove, { passive: true });
   };
 
   // Clean up recording state on unmount
@@ -272,6 +419,10 @@ export const MainChat: React.FC<MainChatProps> = ({
       }
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
         mediaRecorderRef.current.stop();
+      }
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => { });
       }
     };
   }, []);
@@ -783,7 +934,7 @@ export const MainChat: React.FC<MainChatProps> = ({
             }}
           >
             <FontAwesomeIcon icon={faThumbtack} className="menuIcon" />
-            {pinnedIds.includes(msg.id) ? "Открепить" : "Закрепить"}
+            {pinnedIds.includes(msg.id) ? "Unpin" : "Pin"}
           </button>
           <button
             type="button"
@@ -795,7 +946,7 @@ export const MainChat: React.FC<MainChatProps> = ({
             }}
           >
             <FontAwesomeIcon icon={faCopy} className="menuIcon" />
-            Копировать
+            Copy
           </button>
           {msg.isOwn && onDeleteMessage && (
             <button
@@ -804,7 +955,7 @@ export const MainChat: React.FC<MainChatProps> = ({
               onClick={() => void handleDelete(msg.id)}
             >
               <FontAwesomeIcon icon={faTrash} className="menuIcon logOutIcon" />
-              Удалить
+              Delete
             </button>
           )}
         </div>
@@ -821,7 +972,7 @@ export const MainChat: React.FC<MainChatProps> = ({
               ref={searchInputRef}
               type="search"
               className="chat-search-input"
-              placeholder="Поиск в чате"
+              placeholder="Search in chat"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -864,10 +1015,10 @@ export const MainChat: React.FC<MainChatProps> = ({
               type="button"
               className="chat-search-close"
               onClick={closeSearch}
-              aria-label="Закрыть поиск"
+              aria-label="Close search"
             >
               <FontAwesomeIcon icon={faXmark} />
-              <span>Закрыть</span>
+              <span>Close</span>
             </button>
           </div>
         ) : (
@@ -924,20 +1075,7 @@ export const MainChat: React.FC<MainChatProps> = ({
               >
                 <SearchIcon />
               </button>
-              <button
-                type="button"
-                className={`chat-link chat-header-btn--pin ${pinPanelOpen || pinnedMessages.length ? "active" : ""}`}
-                onClick={() => {
-                  setPinPanelOpen((v) => !v);
-                  setMoreMenuOpen(false);
-                }}
-                aria-label="Pinned messages"
-              >
-                <PinIcon />
-                {pinnedMessages.length > 0 && (
-                  <span className="chat-action-badge">{pinnedMessages.length}</span>
-                )}
-              </button>
+
               {activeChat.type === "direct" && (
                 <>
                   <button
@@ -946,7 +1084,7 @@ export const MainChat: React.FC<MainChatProps> = ({
                     aria-label="Voice call"
                     onClick={() => onStartCall?.("audio")}
                     disabled={isCallActive || !activeChat.userId}
-                    title={isCallActive ? "Звонок уже активен" : "Аудиозвонок"}
+                    title={isCallActive ? "Call already active" : "Audio call"}
                   >
                     <PhoneIcon />
                   </button>
@@ -956,7 +1094,7 @@ export const MainChat: React.FC<MainChatProps> = ({
                     aria-label="Video call"
                     onClick={() => onStartCall?.("video")}
                     disabled={isCallActive || !activeChat.userId}
-                    title={isCallActive ? "Звонок уже активен" : "Видеозвонок"}
+                    title={isCallActive ? "Call already active" : "Video call"}
                   >
                     <VideoIcon />
                   </button>
@@ -982,19 +1120,7 @@ export const MainChat: React.FC<MainChatProps> = ({
                       }}
                     >
                       <FontAwesomeIcon icon={faSearch} className="menuIcon" />
-                      Поиск в чате
-                    </button>
-                    <button
-                      type="button"
-                      className="ItemStyle chat-more-menu-item--mobile"
-                      onClick={() => {
-                        setPinPanelOpen(true);
-                        setMoreMenuOpen(false);
-                      }}
-                    >
-                      <FontAwesomeIcon icon={faThumbtack} className="menuIcon" />
-                      Закреплённые
-                      {pinnedMessages.length > 0 && ` (${pinnedMessages.length})`}
+                      Search in chat
                     </button>
                     <button
                       type="button"
@@ -1010,7 +1136,7 @@ export const MainChat: React.FC<MainChatProps> = ({
                         icon={muted ? faBell : faBellSlash}
                         className="menuIcon"
                       />
-                      {muted ? "Включить уведомления" : "Без звука"}
+                      {muted ? "Unmute notifications" : "Mute"}
                     </button>
                     {activeChat.inviteLink && (
                       <button
@@ -1025,7 +1151,7 @@ export const MainChat: React.FC<MainChatProps> = ({
                         }}
                       >
                         <FontAwesomeIcon icon={faCopy} className="menuIcon" />
-                        Копировать ссылку
+                        Copy link
                       </button>
                     )}
                     {pinnedMessages.length > 0 && (
@@ -1039,7 +1165,7 @@ export const MainChat: React.FC<MainChatProps> = ({
                         }}
                       >
                         <FontAwesomeIcon icon={faThumbtackSlash} />
-                        Открепить все
+                        Unpin all
                       </button>
                     )}
                     <button
@@ -1048,7 +1174,7 @@ export const MainChat: React.FC<MainChatProps> = ({
                       onClick={() => {
                         if (
                           window.confirm(
-                            "Очистить историю на этом устройстве? На сервере сообщения останутся.",
+                            "Clear history on this device? Messages will remain on the server.",
                           )
                         ) {
                           onClearChat?.(chatId);
@@ -1056,7 +1182,7 @@ export const MainChat: React.FC<MainChatProps> = ({
                         setMoreMenuOpen(false);
                       }}
                     >
-                      Очистить историю
+                      Clear history
                     </button>
 
                   </div>
@@ -1109,19 +1235,6 @@ export const MainChat: React.FC<MainChatProps> = ({
 
       {pinPanelOpen && (
         <div className="pinned-panel menu-slide-in">
-          <div className="pinned-panel-header">
-            <h3>
-              <FontAwesomeIcon icon={faThumbtack} /> Pinned messages
-            </h3>
-            <button
-              type="button"
-              className="chat-link"
-              onClick={() => setPinPanelOpen(false)}
-              aria-label="Close pinned panel"
-            >
-              <FontAwesomeIcon icon={faXmark} />
-            </button>
-          </div>
           {pinnedMessages.length === 0 ? (
             <p className="pinned-panel-empty">
               No pinned messages. Right-click a message and choose Pin.
@@ -1154,7 +1267,7 @@ export const MainChat: React.FC<MainChatProps> = ({
                         onClick={() => togglePin(msg.id)}
                         aria-label="Unpin"
                       >
-                        <FontAwesomeIcon icon={faXmark} />
+                        <FontAwesomeIcon icon={faTrash} />
                       </button>
                     )}
                   </li>
@@ -1502,118 +1615,141 @@ export const MainChat: React.FC<MainChatProps> = ({
             onClose={() => setIsEmojiPickerOpen(false)}
           />
         )}
-        {!isGuest && isRecording ? (
-          <div className="voice-recording-container">
-            <div className="voice-recording-info">
-              <span className="voice-recording-dot"></span>
-              <span className="voice-recording-timer">{formatRecordingTime(recordingTime)}</span>
-              <span className="voice-recording-label">Запись голосового сообщения...</span>
-            </div>
-            <div className="voice-recording-actions">
+        <div
+          className={`message-input-container ${isGuest ? "guest-disabled" : ""} ${isRecording ? "message-input-container--recording" : ""}`}
+        >
+          {isRecording ? (
+            <>
               <button
                 type="button"
-                className="voice-recording-cancel-btn"
+                className="voice-recording-trash-btn"
                 onClick={cancelRecording}
-                title="Отменить"
+                title="Cancel recording"
               >
-                <FontAwesomeIcon icon={faTrash} /> Отмена
+                <FontAwesomeIcon icon={faTrash} />
               </button>
-              <button
-                type="button"
-                className="voice-recording-send-btn"
-                onClick={stopRecording}
-                title="Отправить"
-              >
-                <FontAwesomeIcon icon={faCircleCheck} /> Отправить
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div
-            className={`message-input-container ${isGuest ? "guest-disabled" : ""}`}
-          >
-            <button
-              ref={buttonRef}
-              className="paperclip"
-              onClick={() => !isGuest && setIsClipOpen(!isClipOpen)}
-              disabled={isGuest}
-            >
-              <PaperclipIcon />
-            </button>
 
-            <input
-              type="text"
-              className="message-input"
-              placeholder={
-                isGuest
-                  ? "You are in Guest Mode (Read-Only)"
-                  : messageInputPlaceholder || ""
-              }
-              disabled={isGuest}
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !isGuest && inputText.trim()) {
-                  submitTextMessage();
-                }
-              }}
-            />
-            <div className="input-actions">
+              <div className="voice-recording-meta">
+                <span className="voice-recording-dot"></span>
+                <span className="voice-recording-timer">{formatRecordingTime(recordingTime)}</span>
+                {!isLocked && (
+                  <span className="voice-recording-slide-hint">
+                    <FontAwesomeIcon icon={faArrowLeft} className="slide-arrow" /> Slide left to cancel
+                  </span>
+                )}
+                <div className="voice-wave-animation">
+                  {audioLevels.map((level, i) => (
+                    <span
+                      key={i}
+                      className="bar"
+                      style={{
+                        transform: `scaleY(${Math.max(0.08, level)})`,
+                        opacity: Math.max(0.4, level),
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+
               <button
                 type="button"
-                onClick={() => !isGuest && setIsEmojiPickerOpen(!isEmojiPickerOpen)}
-                disabled={isGuest}
-                title="Выбрать эмодзи"
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  color: "inherit",
-                  padding: 0,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center"
-                }}
-              >
-                <SmileIcon />
-              </button>
-              <button
-                type="button"
-                onClick={() => !isGuest && startRecording()}
-                disabled={isGuest}
-                title="Записать голосовое сообщение"
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  color: "inherit",
-                  padding: 0,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center"
-                }}
-              >
-                <MicIcon />
-              </button>
-              <button
-                className="send-btn"
-                onClick={() => {
-                  submitTextMessage();
-                }}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  color: "inherit",
-                  padding: 0,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                }}
-                disabled={isGuest}
+                className="voice-recording-send-btn-tg"
+                onClick={stopRecording}
+                title="Send"
               >
                 <SendIcon />
               </button>
-            </div>
-          </div>
-        )}
+            </>
+          ) : (
+            <>
+              <button
+                ref={buttonRef}
+                className="paperclip"
+                onClick={() => !isGuest && setIsClipOpen(!isClipOpen)}
+                disabled={isGuest}
+              >
+                <PaperclipIcon />
+              </button>
+
+              <input
+                type="text"
+                className="message-input"
+                placeholder={
+                  isGuest
+                    ? "You are in Guest Mode (Read-Only)"
+                    : messageInputPlaceholder || ""
+                }
+                disabled={isGuest}
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !isGuest && inputText.trim()) {
+                    submitTextMessage();
+                  }
+                }}
+              />
+              <div className="input-actions">
+                <button
+                  type="button"
+                  className="emoji-picker-toggle-btn"
+                  onClick={() => !isGuest && setIsEmojiPickerOpen(!isEmojiPickerOpen)}
+                  disabled={isGuest}
+                  title="Select emoji"
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    color: "inherit",
+                    padding: 0,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center"
+                  }}
+                >
+                  <SmileIcon />
+                </button>
+                {inputText.trim() ? (
+                  <button
+                    className="send-btn"
+                    onClick={() => {
+                      submitTextMessage();
+                    }}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: "inherit",
+                      padding: 0,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                    disabled={isGuest}
+                  >
+                    <SendIcon />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onMouseDown={handleMicStart}
+                    onTouchStart={handleMicStart}
+                    disabled={isGuest}
+                    title="Record voice message"
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: "inherit",
+                      padding: 0,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center"
+                    }}
+                  >
+                    <MicIcon />
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </main>
   );

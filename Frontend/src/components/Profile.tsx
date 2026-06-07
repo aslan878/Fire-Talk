@@ -104,6 +104,19 @@ const Profile: React.FC<ProfileProps> = () => {
     fetchProfile();
   }, []);
 
+  // Close birthday selector on click outside
+  useEffect(() => {
+    if (!isEditingBirthday) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && !target.closest(".birthday-card")) {
+        setIsEditingBirthday(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [isEditingBirthday]);
+
   const saveProfile = async (updates: {
     firstName?: string;
     lastName?: string;

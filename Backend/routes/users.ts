@@ -132,7 +132,7 @@ router.get("/search", requireUser, async (req, res, next) => {
 
     const term = query.trim();
     const foundUsers = await User.find({
-      _id: { $ne: req.userId }, // Исключаем себя
+      _id: { $ne: req.userId }, // Exclude self
       $or: [
         { username: { $regex: term, $options: "i" } },
         { firstName: { $regex: term, $options: "i" } },

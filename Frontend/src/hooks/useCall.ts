@@ -144,7 +144,7 @@ export function useCall(
           pc.connectionState === "failed" ||
           pc.connectionState === "disconnected"
         ) {
-          setCallError("Соединение потеряно");
+          setCallError("Connection lost");
         }
       };
 
@@ -204,8 +204,8 @@ export function useCall(
       console.error("acceptCall media error:", e);
       setCallError(
         currentCallType === "video"
-          ? "Не удалось получить доступ к камере или микрофону"
-          : "Не удалось получить доступ к микрофону"
+          ? "Failed to access camera or microphone"
+          : "Failed to access microphone"
       );
       rejectCall();
     }
@@ -266,8 +266,8 @@ export function useCall(
         console.error("createAndSendOffer error:", e);
         setCallError(
           currentCallType === "video"
-            ? "Не удалось начать видеозвонок"
-            : "Не удалось начать аудиозвонок"
+            ? "Failed to start video call"
+            : "Failed to start audio call"
         );
         endCall();
       }
@@ -385,7 +385,7 @@ export function useCall(
 
     const onReject = (payload: { callId: string }) => {
       if (callIdRef.current !== payload.callId) return;
-      setCallError("Абонент отклонил звонок");
+      setCallError("User declined the call");
       resetCall();
     };
 
@@ -396,7 +396,7 @@ export function useCall(
 
     const onBusy = (payload: { callId: string }) => {
       if (callIdRef.current !== payload.callId) return;
-      setCallError("Абонент занят");
+      setCallError("User is busy");
       resetCall();
     };
 
