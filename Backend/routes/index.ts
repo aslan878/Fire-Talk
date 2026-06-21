@@ -6,11 +6,15 @@ import conversationsRouter from "./conversations";
 import chatsAllRouter from "./chats-all";
 import authRouter from "./auth";
 import usersRouter from "./users";
+import savedRouter from "./saved";
+import settingsRouter from "./settings";
 
 const router = Router();
 
 router.use("/auth", authRouter);
 router.use("/users", usersRouter);
+router.use("/saved", savedRouter);
+router.use("/settings", settingsRouter);
 router.use("/messages", messagesRouter);
 router.use("/groups", groupsRouter);
 router.use("/channels", channelsRouter);

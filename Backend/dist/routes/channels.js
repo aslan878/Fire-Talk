@@ -61,3 +61,4 @@ router.post("/", requireUser_1.requireUser, async (req, res) => {
     res.status(201).json(channel);
 });
 exports.default = router;
+//# sourceMappingURL=channels.js.map

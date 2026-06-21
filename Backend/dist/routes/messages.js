@@ -422,3 +422,4 @@ router.post("/:messageId/todo/:itemIndex/toggle", requireUser_1.requireUser, asy
     res.json(msg.todo);
 });
 exports.default = router;
+//# sourceMappingURL=messages.js.map

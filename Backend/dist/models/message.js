@@ -106,3 +106,4 @@ const messageSchema = new mongoose_1.default.Schema({
 }, { timestamps: true });
 messageSchema.index({ chatType: 1, chatId: 1, createdAt: -1 });
 exports.default = mongoose_1.default.model("Message", messageSchema);
+//# sourceMappingURL=message.js.map

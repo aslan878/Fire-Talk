@@ -57,3 +57,4 @@ router.post("/open", requireUser_1.requireUser, async (req, res) => {
     res.status(created ? 201 : 200).json(conv);
 });
 exports.default = router;
+//# sourceMappingURL=conversations.js.map

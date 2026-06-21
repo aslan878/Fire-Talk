@@ -271,6 +271,55 @@ function formatReactionsForClient(
   }));
 }
 
+// ── PATCH edit message ────────────────────────────────────────────
+router.patch("/:messageId", requireUser, async (req, res) => {
+  const { messageId } = req.params;
+  const { text } = req.body as { text?: string };
+
+  if (!mongoose.isValidObjectId(messageId)) {
+    res.status(400).json({ error: "Invalid messageId" });
+    return;
+  }
+  if (typeof text !== "string" || !text.trim()) {
+    res.status(400).json({ error: "text is required" });
+    return;
+  }
+  if (text.length > 16000) {
+    res.status(400).json({ error: "Message too long" });
+    return;
+  }
+
+  const msg = await Message.findOne({ _id: messageId, deletedAt: null });
+  if (!msg) {
+    res.status(404).json({ error: "Message not found" });
+    return;
+  }
+  if (msg.sender.toString() !== req.userId) {
+    res.status(403).json({ error: "You can only edit your own messages" });
+    return;
+  }
+  if (msg.kind !== "text") {
+    res.status(400).json({ error: "Only text messages can be edited" });
+    return;
+  }
+
+  msg.text = text.trim();
+  msg.editedAt = new Date();
+  await msg.save();
+
+  const io = req.app.get("io");
+  if (io) {
+    io.to(msg.chatId.toString()).emit("message_edited", {
+      messageId: msg._id,
+      text: msg.text,
+      editedAt: msg.editedAt,
+      chatId: msg.chatId.toString(),
+    });
+  }
+
+  res.json({ success: true, messageId: msg._id, text: msg.text, editedAt: msg.editedAt });
+});
+
 // ── DELETE message (soft) ─────────────────────────────────────────
 router.delete("/:messageId", requireUser, async (req, res) => {
   const { messageId } = req.params;

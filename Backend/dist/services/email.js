@@ -92,3 +92,4 @@ const sendOtpEmail = async (toEmail, otpCode) => {
     });
 };
 exports.sendOtpEmail = sendOtpEmail;
+//# sourceMappingURL=email.js.map

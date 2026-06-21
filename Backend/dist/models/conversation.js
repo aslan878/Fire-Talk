@@ -33,3 +33,4 @@ conversationSchema.pre("validate", function () {
 });
 conversationSchema.index({ "participants.0": 1, "participants.1": 1 }, { unique: true });
 exports.default = mongoose_1.default.model("Conversation", conversationSchema);
+//# sourceMappingURL=conversation.js.map

@@ -64,6 +64,7 @@ body {
     system-ui,
     -apple-system,
     sans-serif;
+  font-size: var(--base-font-size, 14px);
   overflow: hidden;
 }
 
@@ -87,3 +88,60 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #3f3f50;
 }
+
+/* Font Size Scaling */
+body.font-small {
+  --base-font-size: 12px;
+}
+body.font-medium {
+  --base-font-size: 14px;
+}
+body.font-large {
+  --base-font-size: 16px;
+}
+
+/* Specific elements scaling */
+body.font-small .message-bubble { font-size: 13px; }
+body.font-large .message-bubble { font-size: 17px; }
+
+body.font-small .message-sender { font-size: 12px; }
+body.font-large .message-sender { font-size: 16px; }
+
+body.font-small .message-time { font-size: 10px; }
+body.font-large .message-time { font-size: 14px; }
+
+body.font-small .chat-item-name { font-size: 13px; }
+body.font-large .chat-item-name { font-size: 17px; }
+
+body.font-small .chat-item-last-message { font-size: 11px; }
+body.font-large .chat-item-last-message { font-size: 15px; }
+
+body.font-small .chat-item-time { font-size: 10px; }
+body.font-large .chat-item-time { font-size: 14px; }
+
+body.font-small .message-input { font-size: 13px; }
+body.font-large .message-input { font-size: 17px; }
+
+body.font-small .chat-header-info h2 { font-size: 14px; }
+body.font-large .chat-header-info h2 { font-size: 18px; }
+
+body.font-small .chat-header-status { font-size: 10px; }
+body.font-large .chat-header-status { font-size: 14px; }
+
+body.font-small .search-input { font-size: 13px; }
+body.font-large .search-input { font-size: 17px; }
+
+body.font-small .tab { font-size: 10px; }
+body.font-large .tab { font-size: 14px; }
+
+body.font-small .settings-row,
+body.font-small .settings-toggle-row {
+  font-size: 12px;
+}
+body.font-large .settings-row,
+body.font-large .settings-toggle-row {
+  font-size: 16px;
+}
+
+body.font-small .settings-row select { font-size: 11px; }
+body.font-large .settings-row select { font-size: 15px; }

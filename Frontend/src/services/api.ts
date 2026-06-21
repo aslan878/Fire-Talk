@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { API_URL } from "../config";
 
 export interface UserProfile {
@@ -152,6 +153,49 @@ export interface MessageReaction {
   userReacted?: boolean;
 }
 
+export interface SavedMessage {
+  _id: string;
+  messageId: string;
+  userId: string;
+  message: MessageResponse;
+  savedAt: string;
+}
+
+export interface UserSettings {
+  _id: string;
+  userId: string;
+  // Appearance & Chat Settings
+  theme?: "light" | "dark" | "auto";
+  language?: string;
+  fontSize?: "small" | "medium" | "large";
+  compactMode?: boolean;
+  messagePreview?: boolean;
+
+  // Notifications & Sounds
+  notifications?: boolean;
+  soundEnabled?: boolean;
+  notificationSound?: "default" | "subtle" | "loud";
+  notificationVibration?: boolean;
+  groupNotifications?: boolean;
+  mentionSound?: boolean;
+
+  // Privacy & Security
+  onlineStatus?: boolean;
+  privateMessages?: "all" | "friends" | "none";
+  readReceipts?: boolean;
+  typingIndicator?: boolean;
+  lastSeen?: boolean;
+  twoFactorAuth?: boolean;
+  blockUnknown?: boolean;
+
+  // Data & Storage
+  messageRetention?: "forever" | "1year" | "6months" | "3months";
+  autoClearCache?: boolean;
+  downloadMedia?: boolean;
+
+  updatedAt: string;
+}
+
 export interface MessageResponse {
   _id: string;
   sender: MessageSender; // Populated on backend
@@ -163,11 +207,53 @@ export interface MessageResponse {
   poll?: MessagePoll;
   todo?: MessageTodo;
   reactions?: MessageReaction[];
-  replyTo?: any; // Can be populated with text/kind/sender or null
+  replyTo?: any;
   readBy?: { user: string; readAt: string }[];
   createdAt: string;
   updatedAt: string;
 }
+
+export const getCookie = (name: string): string | null => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) {
+    const rawVal = parts.pop()?.split(";").shift();
+    if (rawVal) {
+      try {
+        return decodeURIComponent(rawVal);
+      } catch (e) {
+        return rawVal;
+      }
+    }
+  }
+  return null;
+};
+
+export const setCookie = (name: string, value: string, days = 365) => {
+  const expires = new Date(Date.now() + days * 86400000).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+};
+
+export const saveSettingsToCookies = (settings: Partial<UserSettings>) => {
+  try {
+    const existingStr = getCookie("user_settings");
+    const existing = existingStr ? JSON.parse(existingStr) : {};
+    const updated = { ...existing, ...settings };
+    setCookie("user_settings", JSON.stringify(updated));
+  } catch (e) {
+    console.error("Failed to save settings to cookies:", e);
+  }
+};
+
+export const getSettingsFromCookies = (): Partial<UserSettings> | null => {
+  try {
+    const cookie = getCookie("user_settings");
+    return cookie ? JSON.parse(cookie) : null;
+  } catch (e) {
+    console.error("Failed to read settings from cookies:", e);
+    return null;
+  }
+};
 
 const BASE_URL = API_URL;
 
@@ -271,9 +357,9 @@ export const api = {
         body: JSON.stringify(updates),
       }),
 
-    searchUsers: (query: string) =>
+    searchUsers: (query: string, connectedOnly?: boolean) =>
       request<UserProfile[]>(
-        `/users/search?query=${encodeURIComponent(query)}`,
+        `/users/search?query=${encodeURIComponent(query)}&connectedOnly=${!!connectedOnly}`,
       ),
   },
   chats: {
@@ -389,6 +475,15 @@ export const api = {
         { method: "DELETE" },
       ),
 
+    editMessage: (messageId: string, text: string) =>
+      request<{ success: boolean; messageId: string; text: string; editedAt: string }>(
+        `/messages/${messageId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ text }),
+        },
+      ),
+
     reactToMessage: (messageId: string, emoji: string) =>
       request<{ reactions: MessageReaction[] }>(
         `/messages/${messageId}/react`,
@@ -397,5 +492,155 @@ export const api = {
           body: JSON.stringify({ emoji }),
         },
       ),
+  },
+
+  saved: {
+    getSavedMessages: (limit?: number, offset?: number) => {
+      const params = new URLSearchParams();
+      if (limit !== undefined) params.append("limit", limit.toString());
+      if (offset !== undefined) params.append("offset", offset.toString());
+      const queryString = params.toString();
+      return request<{ messages: SavedMessage[]; total: number }>(
+        `/saved${queryString ? `?${queryString}` : ""}`,
+      );
+    },
+
+    saveMessage: (messageId: string) =>
+      request<SavedMessage>("/saved", {
+        method: "POST",
+        body: JSON.stringify({ messageId }),
+      }),
+
+    unsaveMessage: (messageId: string) =>
+      request<{ success: boolean; messageId: string }>(`/saved/${messageId}`, {
+        method: "DELETE",
+      }),
+
+    deleteSavedMessage: (savedId: string) =>
+      request<{ success: boolean; id: string }>(`/saved/${savedId}`, {
+        method: "DELETE",
+      }),
+  },
+
+  settings: {
+    getSettings: async () => {
+      try {
+        const data = await request<UserSettings>("/settings");
+        saveSettingsToCookies(data);
+        return data;
+      } catch (err) {
+        const fromCookies = getSettingsFromCookies();
+        if (fromCookies) {
+          return fromCookies as UserSettings;
+        }
+        throw err;
+      }
+    },
+
+    updateSettings: async (updates: Partial<UserSettings>) => {
+      saveSettingsToCookies(updates);
+      const response = await request<{ message: string; settings: UserSettings }>("/settings", {
+        method: "PUT",
+        body: JSON.stringify(updates),
+      });
+      if (response && response.settings) {
+        saveSettingsToCookies(response.settings);
+      }
+      return response;
+    },
+
+    getTheme: async () => {
+      try {
+        const res = await request<{ theme: "light" | "dark" | "auto" }>("/settings/theme");
+        saveSettingsToCookies({ theme: res.theme });
+        return res;
+      } catch (err) {
+        const fromCookies = getSettingsFromCookies();
+        if (fromCookies && fromCookies.theme) {
+          return { theme: fromCookies.theme };
+        }
+        throw err;
+      }
+    },
+
+    updateTheme: async (theme: "light" | "dark" | "auto") => {
+      saveSettingsToCookies({ theme });
+      return request<{ theme: "light" | "dark" | "auto" }>("/settings/theme", {
+        method: "PUT",
+        body: JSON.stringify({ theme }),
+      });
+    },
+
+    getNotifications: async () => {
+      try {
+        const res = await request<{ notifications: boolean; sound: boolean }>(
+          "/settings/notifications",
+        );
+        saveSettingsToCookies({ notifications: res.notifications, soundEnabled: res.sound });
+        return res;
+      } catch (err) {
+        const fromCookies = getSettingsFromCookies();
+        if (fromCookies) {
+          return {
+            notifications: fromCookies.notifications ?? true,
+            sound: fromCookies.soundEnabled ?? true,
+          };
+        }
+        throw err;
+      }
+    },
+
+    updateNotifications: async (notifications: boolean, sound?: boolean) => {
+      saveSettingsToCookies({ notifications, soundEnabled: sound });
+      return request<{ notifications: boolean; sound: boolean }>(
+        "/settings/notifications",
+        {
+          method: "PUT",
+          body: JSON.stringify({ notifications, sound }),
+        },
+      );
+    },
+
+    getPrivacy: async () => {
+      try {
+        const res = await request<{
+          onlineStatus: boolean;
+          readReceipts: boolean;
+          typingIndicator: boolean;
+        }>("/settings/privacy");
+        saveSettingsToCookies({
+          onlineStatus: res.onlineStatus,
+          readReceipts: res.readReceipts,
+          typingIndicator: res.typingIndicator,
+        });
+        return res;
+      } catch (err) {
+        const fromCookies = getSettingsFromCookies();
+        if (fromCookies) {
+          return {
+            onlineStatus: fromCookies.onlineStatus ?? true,
+            readReceipts: fromCookies.readReceipts ?? true,
+            typingIndicator: fromCookies.typingIndicator ?? true,
+          };
+        }
+        throw err;
+      }
+    },
+
+    updatePrivacy: async (data: {
+      onlineStatus?: boolean;
+      readReceipts?: boolean;
+      typingIndicator?: boolean;
+    }) => {
+      saveSettingsToCookies(data);
+      return request<{
+        onlineStatus: boolean;
+        readReceipts: boolean;
+        typingIndicator: boolean;
+      }>("/settings/privacy", {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
+    },
   },
 };

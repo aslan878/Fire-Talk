@@ -27,6 +27,7 @@ import {
   faArrowLeft,
   faBell,
   faBellSlash,
+  faBookmark,
   faThumbtackSlash,
   faChevronDown,
   faChevronUp,
@@ -40,7 +41,13 @@ import {
   faTrash,
   faXmark,
   faSearch,
+  faCheck,
+  faCheckDouble,
+  faPen,
+  faReply,
 } from "@fortawesome/free-solid-svg-icons";
+import { useSettings } from "../contexts/SettingsContext";
+import { useModal } from "./Modal";
 import { HighlightText } from "./HighlightText";
 import {
   findMessageSearchIndices,
@@ -70,6 +77,7 @@ export interface SendMessagePayload {
       completedBy?: Array<{ userId: string; completedAt?: string }>;
     }>;
   };
+  replyTo?: string;
 }
 
 interface MainChatProps {
@@ -91,6 +99,15 @@ interface MainChatProps {
   onReactToMessage?: (messageId: string, emoji: string) => Promise<void>;
   onStartCall?: (type: "audio" | "video") => void;
   isCallActive?: boolean;
+  typingUsernames?: string[];
+  onTyping?: () => void;
+  onStopTyping?: () => void;
+  /** ID of a message to scroll to and highlight (from Saved Messages navigation). */
+  targetMessageId?: string | null;
+  /** Callback to clear targetMessageId after scrolling. */
+  onClearTargetMessageId?: () => void;
+  /** Edit an existing message (own text messages only). */
+  onEditMessage?: (messageId: string, newText: string) => Promise<void>;
 }
 
 export const MainChat: React.FC<MainChatProps> = ({
@@ -112,7 +129,15 @@ export const MainChat: React.FC<MainChatProps> = ({
   onReactToMessage,
   onStartCall,
   isCallActive,
+  typingUsernames = [],
+  onTyping,
+  onStopTyping,
+  targetMessageId,
+  onClearTargetMessageId,
+  onEditMessage,
 }) => {
+  const { settings } = useSettings();
+  const { showConfirm, showAlert } = useModal();
   // Get current user ID from props or localStorage
   const userId =
     currentUserId ||
@@ -142,6 +167,30 @@ export const MainChat: React.FC<MainChatProps> = ({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
+  // Typing state tracking refs
+  const isTypingRef = useRef(false);
+  const stopTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearTypingStatus = () => {
+    if (isTypingRef.current) {
+      isTypingRef.current = false;
+      if (onStopTyping) onStopTyping();
+    }
+    if (stopTypingTimeoutRef.current) {
+      clearTimeout(stopTypingTimeoutRef.current);
+      stopTypingTimeoutRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    // Stop typing when switching chats or unmounting
+    return () => {
+      clearTypingStatus();
+    };
+  }, [activeChat]);
+
+
+
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchMatchIndex, setSearchMatchIndex] = useState(0);
@@ -153,6 +202,7 @@ export const MainChat: React.FC<MainChatProps> = ({
     null,
   );
   const [copyToast, setCopyToast] = useState(false);
+  const [saveToast, setSaveToast] = useState(false);
   const [pinnedPreviewDismissed, setPinnedPreviewDismissed] = useState(false);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
@@ -161,6 +211,17 @@ export const MainChat: React.FC<MainChatProps> = ({
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [audioLevels, setAudioLevels] = useState<number[]>(new Array(24).fill(0));
+
+  // Reply-to state
+  const [replyingTo, setReplyingTo] = useState<{ id: string; text: string; senderName: string; kind?: string } | null>(null);
+
+  // Edit message state
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const editInputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Jump-to-bottom
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -257,7 +318,7 @@ export const MainChat: React.FC<MainChatProps> = ({
       }
     } catch (err) {
       console.error("Failed to start voice recording:", err);
-      window.alert("Could not access microphone. Please allow microphone access.");
+      showAlert("Could not access microphone. Please allow microphone access in your browser settings.");
       setIsRecording(false);
       setIsLocked(false);
       isLockedRef.current = false;
@@ -444,28 +505,31 @@ export const MainChat: React.FC<MainChatProps> = ({
 
   const handleDelete = async (messageId: string) => {
     if (!onDeleteMessage) return;
-    if (!window.confirm("Delete this message for everyone?")) return;
-
-    setDeletingIds((prev) => new Set(prev).add(messageId));
-    setContextMessageId(null);
-    await new Promise((r) => window.setTimeout(r, 280));
-
-    try {
-      await onDeleteMessage(messageId);
-      setPinnedIds((prev) => {
-        const next = prev.filter((id) => id !== messageId);
-        savePinnedIds(chatId, next);
-        return next;
-      });
-    } catch (error) {
-      console.error("Failed to delete message:", error);
-    } finally {
-      setDeletingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(messageId);
-        return next;
-      });
-    }
+    showConfirm(
+      "Delete this message for everyone?",
+      async () => {
+        setDeletingIds((prev) => new Set(prev).add(messageId));
+        setContextMessageId(null);
+        await new Promise((r) => window.setTimeout(r, 280));
+        try {
+          await onDeleteMessage(messageId);
+          setPinnedIds((prev) => {
+            const next = prev.filter((id) => id !== messageId);
+            savePinnedIds(chatId, next);
+            return next;
+          });
+        } catch (error) {
+          console.error("Failed to delete message:", error);
+        } finally {
+          setDeletingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(messageId);
+            return next;
+          });
+        }
+      },
+      { confirmText: "Delete", danger: true, title: "Delete Message" }
+    );
   };
 
   useEffect(() => {
@@ -477,7 +541,41 @@ export const MainChat: React.FC<MainChatProps> = ({
     setMoreMenuOpen(false);
     setContextMessageId(null);
     setPinnedPreviewDismissed(false);
+    // Clear reply/edit state on chat switch
+    setReplyingTo(null);
+    setEditingMessageId(null);
+    setEditText("");
   }, [chatId]);
+
+  // Scroll to and highlight a target message when navigating from Saved Messages
+  useEffect(() => {
+    if (!targetMessageId || messagesLoading) return;
+
+    const area = messagesAreaRef.current;
+    if (!area) return;
+
+    // Small delay so the DOM has settled after messages render
+    const timer = window.setTimeout(() => {
+      const el = area.querySelector<HTMLElement>(
+        `[data-message-id="${targetMessageId}"]`,
+      );
+      if (!el) return;
+
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+
+      // Add pulse highlight class and remove it after the animation completes
+      el.classList.add("message-highlight-pulse");
+      const removeHighlight = () => {
+        el.classList.remove("message-highlight-pulse");
+        el.removeEventListener("animationend", removeHighlight);
+      };
+      el.addEventListener("animationend", removeHighlight);
+
+      onClearTargetMessageId?.();
+    }, 150);
+
+    return () => window.clearTimeout(timer);
+  }, [targetMessageId, messagesLoading, onClearTargetMessageId]);
 
   const searchMatchIndices = findMessageSearchIndices(messages, searchQuery);
   const activeSearchMessageIndex =
@@ -574,6 +672,18 @@ export const MainChat: React.FC<MainChatProps> = ({
     window.setTimeout(() => setCopyToast(false), 1600);
   };
 
+  const handleSaveMessage = async (messageId: string) => {
+    try {
+      await api.saved.saveMessage(messageId);
+      setSaveToast(true);
+      window.setTimeout(() => setSaveToast(false), 1600);
+    } catch (error) {
+      console.error("Failed to save message:", error);
+    } finally {
+      setContextMessageId(null);
+    }
+  };
+
   // Scroll to bottom only when new messages arrive, not on reactions/edits
   useEffect(() => {
     if (messagesLoading || !messagesAreaRef.current) return;
@@ -616,11 +726,83 @@ export const MainChat: React.FC<MainChatProps> = ({
       avatar
     );
 
+  // Auto-resize textarea helper
+  const autoResizeTextarea = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 140) + "px";
+  };
+
+  // Scroll tracking for jump-to-bottom
+  const handleMessagesScroll = () => {
+    const area = messagesAreaRef.current;
+    if (!area) return;
+    const distFromBottom = area.scrollHeight - area.scrollTop - area.clientHeight;
+    setShowJumpToBottom(distFromBottom > 200);
+  };
+
+  const jumpToBottom = () => {
+    messagesAreaRef.current?.scrollTo({
+      top: messagesAreaRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  };
+
+  // Edit handlers
+  const startEdit = (msg: Message) => {
+    setEditingMessageId(msg.id);
+    setEditText(msg.text || "");
+    setContextMessageId(null);
+    // Focus edit textarea after render
+    setTimeout(() => {
+      editInputRef.current?.focus();
+      autoResizeTextarea(editInputRef.current);
+    }, 50);
+  };
+
+  const cancelEdit = () => {
+    setEditingMessageId(null);
+    setEditText("");
+  };
+
+  const submitEdit = async () => {
+    if (!editingMessageId || !editText.trim() || !onEditMessage) return;
+    await onEditMessage(editingMessageId, editText.trim());
+    cancelEdit();
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setInputText(val);
+    autoResizeTextarea(e.target);
+
+    if (isGuest || settings.typingIndicator === false) return;
+
+    if (!isTypingRef.current) {
+      isTypingRef.current = true;
+      if (onTyping) onTyping();
+    }
+
+    if (stopTypingTimeoutRef.current) {
+      clearTimeout(stopTypingTimeoutRef.current);
+    }
+
+    stopTypingTimeoutRef.current = setTimeout(() => {
+      isTypingRef.current = false;
+      if (onStopTyping) onStopTyping();
+    }, 2000);
+  };
+
   const submitTextMessage = () => {
     const text = inputText.trim();
     if (!text || isGuest || !onSendMessage) return;
-    onSendMessage({ text, kind: "text" });
+    onSendMessage({ text, kind: "text", ...(replyingTo ? { replyTo: replyingTo.id } : {}) } as any);
     setInputText("");
+    setReplyingTo(null);
+    clearTypingStatus();
+    // Reset textarea height
+    const ta = document.querySelector<HTMLTextAreaElement>(".message-input");
+    if (ta) { ta.style.height = "auto"; }
   };
 
   const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
@@ -632,7 +814,7 @@ export const MainChat: React.FC<MainChatProps> = ({
     if (!file || isGuest || !onSendMessage) return;
 
     if (file.size > MAX_ATTACHMENT_BYTES) {
-      window.alert("File is too large. Maximum size is 4 MB.");
+      showAlert("File is too large. Maximum size is 4 MB.");
       return;
     }
 
@@ -929,6 +1111,33 @@ export const MainChat: React.FC<MainChatProps> = ({
             type="button"
             className="ItemStyle"
             onClick={() => {
+              const senderName = users[msg.userId]?.name || "User";
+              setReplyingTo({
+                id: msg.id,
+                text: msg.text || getMessagePreviewLabel(msg),
+                senderName,
+                kind: msg.kind,
+              });
+              setContextMessageId(null);
+            }}
+          >
+            <FontAwesomeIcon icon={faReply} className="menuIcon" />
+            Reply
+          </button>
+          {msg.isOwn && (!msg.kind || msg.kind === "text") && onEditMessage && (
+            <button
+              type="button"
+              className="ItemStyle"
+              onClick={() => startEdit(msg)}
+            >
+              <FontAwesomeIcon icon={faPen} className="menuIcon" />
+              Edit
+            </button>
+          )}
+          <button
+            type="button"
+            className="ItemStyle"
+            onClick={() => {
               togglePin(msg.id);
               setContextMessageId(null);
             }}
@@ -947,6 +1156,14 @@ export const MainChat: React.FC<MainChatProps> = ({
           >
             <FontAwesomeIcon icon={faCopy} className="menuIcon" />
             Copy
+          </button>
+          <button
+            type="button"
+            className="ItemStyle"
+            onClick={() => void handleSaveMessage(msg.id)}
+          >
+            <FontAwesomeIcon icon={faBookmark} className="menuIcon" />
+            Save
           </button>
           {msg.isOwn && onDeleteMessage && (
             <button
@@ -1043,6 +1260,7 @@ export const MainChat: React.FC<MainChatProps> = ({
               >
                 {renderAvatarContent(activeChat.avatar, activeChat.avatarUrl)}
                 {activeChat.type === "direct" &&
+                  settings.onlineStatus !== false &&
                   activeChat.status === "online" && (
                     <div className="avatar-online-indicator"></div>
                   )}
@@ -1055,13 +1273,22 @@ export const MainChat: React.FC<MainChatProps> = ({
                       <FontAwesomeIcon icon={faBellSlash} /> muted
                     </span>
                   )}
-                  {!muted &&
-                    activeChat.status === "online" &&
-                    onlineText && (
-                      <span style={{ color: "var(--green)" }}>{onlineText}</span>
-                    )}
-                  {!muted && activeChat.activity && (
-                    <span>{activeChat.activity}</span>
+                  {!muted && settings.typingIndicator !== false && typingUsernames && typingUsernames.length > 0 ? (
+                    <span style={{ color: "var(--primary-hover)", fontWeight: 500 }}>
+                      {typingUsernames.join(", ")} {typingUsernames.length === 1 ? "is" : "are"} typing...
+                    </span>
+                  ) : (
+                    <>
+                      {!muted &&
+                        settings.onlineStatus !== false &&
+                        activeChat.status === "online" &&
+                        onlineText && (
+                          <span style={{ color: "var(--green)" }}>{onlineText}</span>
+                        )}
+                      {!muted && activeChat.activity && (activeChat.type !== "direct" || settings.lastSeen !== false) && (
+                        <span>{activeChat.activity}</span>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -1172,13 +1399,13 @@ export const MainChat: React.FC<MainChatProps> = ({
                       type="button"
                       className="LogOutStyle"
                       onClick={() => {
-                        if (
-                          window.confirm(
-                            "Clear history on this device? Messages will remain on the server.",
-                          )
-                        ) {
-                          onClearChat?.(chatId);
-                        }
+                        showConfirm(
+                          "Clear history on this device? Messages will remain on the server.",
+                          () => {
+                            onClearChat?.(chatId);
+                          },
+                          { confirmText: "Clear", danger: true, title: "Clear History" }
+                        );
                         setMoreMenuOpen(false);
                       }}
                     >
@@ -1194,6 +1421,7 @@ export const MainChat: React.FC<MainChatProps> = ({
       </header>
 
       {copyToast && <div className="chat-toast">Copied to clipboard</div>}
+      {saveToast && <div className="chat-toast">Saved message</div>}
 
       {!searchOpen &&
         pinnedMessages.length > 0 &&
@@ -1278,7 +1506,7 @@ export const MainChat: React.FC<MainChatProps> = ({
         </div>
       )}
 
-      <div className="messages-area" ref={messagesAreaRef}>
+      <div className="messages-area" ref={messagesAreaRef} onScroll={handleMessagesScroll}>
         {messagesLoading ? (
           <div className="messages-loading">
             <div className="messages-loading-spinner"></div>
@@ -1384,7 +1612,25 @@ export const MainChat: React.FC<MainChatProps> = ({
                         {!msg.isOwn && sender && (
                           <span className="message-sender">{sender.name}</span>
                         )}
-                        <span className="message-time">{msg.timestamp}</span>
+                        <span className="message-time">
+                          {msg.editedAt && (
+                            <span className="message-edited-label">
+                              (edited) 
+                            </span>
+                          )}
+                          {msg.timestamp}
+                          {msg.isOwn && settings.readReceipts !== false && (
+                            <FontAwesomeIcon
+                              icon={faCheckDouble}
+                              style={{
+                                marginLeft: "5px",
+                                color: "var(--primary)",
+                                fontSize: "11px",
+                                verticalAlign: "middle"
+                              }}
+                            />
+                          )}
+                        </span>
                       </div>
 
                       <div className="message-bubble">
@@ -1393,12 +1639,63 @@ export const MainChat: React.FC<MainChatProps> = ({
                             <FontAwesomeIcon icon={faThumbtack} /> pinned
                           </div>
                         )}
-                        {renderMessageBody(
-                          msg,
-                          searchQuery.trim() &&
-                            searchMatchIndices.includes(index)
-                            ? searchQuery
-                            : "",
+                        {msg.replyTo && (
+                          <div
+                            className="message-reply-quote"
+                            onClick={() => scrollToMessage(msg.replyTo!.id)}
+                          >
+                            <div className="reply-quote-sender">
+                              {msg.replyTo.senderName}
+                            </div>
+                            <div className="reply-quote-text">
+                              {msg.replyTo.text}
+                            </div>
+                          </div>
+                        )}
+                        {editingMessageId === msg.id ? (
+                          <div className="message-edit-container">
+                            <textarea
+                              ref={editInputRef}
+                              className="message-edit-input"
+                              value={editText}
+                              onChange={(e) => {
+                                setEditText(e.target.value);
+                                autoResizeTextarea(e.target);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") {
+                                  cancelEdit();
+                                } else if (e.key === "Enter" && !e.shiftKey) {
+                                  e.preventDefault();
+                                  void submitEdit();
+                                }
+                              }}
+                            />
+                            <div className="message-edit-actions">
+                              <button
+                                type="button"
+                                className="btn-edit-cancel"
+                                onClick={cancelEdit}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-edit-save"
+                                onClick={submitEdit}
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          renderMessageBody(
+                            msg,
+                            searchQuery.trim() &&
+                              searchMatchIndices.includes(index)
+                              ? searchQuery
+                              : "",
+                          )
                         )}
 
                         {msg.reactions && msg.reactions.length > 0 && (
@@ -1457,7 +1754,38 @@ export const MainChat: React.FC<MainChatProps> = ({
         )}
       </div>
 
+      {showJumpToBottom && (
+        <button
+          type="button"
+          className="jump-to-bottom-btn"
+          onClick={jumpToBottom}
+          aria-label="Scroll to bottom"
+        >
+          <FontAwesomeIcon icon={faChevronDown} />
+        </button>
+      )}
+
       <div className="message-input-area">
+        {replyingTo && (
+          <div className="reply-preview-bar">
+            <div className="reply-preview-content">
+              <div className="reply-preview-title">
+                Replying to <span className="reply-preview-sender">{replyingTo.senderName}</span>
+              </div>
+              <div className="reply-preview-text">
+                {replyingTo.text}
+              </div>
+            </div>
+            <button
+              type="button"
+              className="reply-preview-close"
+              onClick={() => setReplyingTo(null)}
+              aria-label="Cancel reply"
+            >
+              <FontAwesomeIcon icon={faXmark} />
+            </button>
+          </div>
+        )}
         {!isGuest && (
           <div className={`ClipStyle ${isClipOpen ? "open" : ""}`} ref={ref}>
             <button
@@ -1671,8 +1999,7 @@ export const MainChat: React.FC<MainChatProps> = ({
                 <PaperclipIcon />
               </button>
 
-              <input
-                type="text"
+              <textarea
                 className="message-input"
                 placeholder={
                   isGuest
@@ -1681,10 +2008,14 @@ export const MainChat: React.FC<MainChatProps> = ({
                 }
                 disabled={isGuest}
                 value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
+                onChange={handleInputChange}
+                rows={1}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !isGuest && inputText.trim()) {
-                    submitTextMessage();
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!isGuest && inputText.trim()) {
+                      submitTextMessage();
+                    }
                   }
                 }}
               />

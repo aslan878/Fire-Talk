@@ -20,6 +20,19 @@ app.use(cors({ origin: allowedOrigins }));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+// Health check endpoint for monitoring services
+app.get("/api/health", (req, res) => {
+  const healthCheck = {
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || "development",
+    database:
+      mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+  };
+  res.status(200).json(healthCheck);
+});
+
 app.use("/api", apiRouter);
 
 const httpServer = createServer(app);
@@ -77,10 +90,46 @@ io.on("connection", (socket) => {
     console.log(`Socket ${socket.id} joined chat ${chatId}`);
   });
 
+  socket.on("typing", (payload: { chatId: string; username: string }) => {
+    if (userId) {
+      socket.to(payload.chatId).emit("user_typing", {
+        chatId: payload.chatId,
+        userId,
+        username: payload.username,
+      });
+    }
+  });
+
+  socket.on("stop_typing", (payload: { chatId: string }) => {
+    if (userId) {
+      socket.to(payload.chatId).emit("user_stop_typing", {
+        chatId: payload.chatId,
+        userId,
+      });
+    }
+  });
+
+  socket.on("set_online_status_preference", async (payload: { onlineStatus: boolean }) => {
+    if (!userId) return;
+    try {
+      const status = payload.onlineStatus ? "online" : "offline";
+      await User.findByIdAndUpdate(userId, { status });
+      io.emit("user_status_changed", {
+        userId,
+        status,
+        lastSeen: new Date().toISOString(),
+      });
+    } catch (e) {
+      console.error("Failed to update status preference:", e);
+    }
+  });
+
   socket.on("join_qr_room", (qrToken: string) => {
     if (qrToken && typeof qrToken === "string") {
       socket.join(`qr_auth_${qrToken}`);
-      console.log(`Socket ${socket.id} joined QR auth room: qr_auth_${qrToken}`);
+      console.log(
+        `Socket ${socket.id} joined QR auth room: qr_auth_${qrToken}`,
+      );
     }
   });
 
@@ -106,41 +155,29 @@ io.on("connection", (socket) => {
     },
   );
 
-  socket.on(
-    "call:accept",
-    (payload: { callId: string; toUserId: string }) => {
-      if (!userId || !payload?.toUserId) return;
-      usersInCall.add(userId);
-      usersInCall.add(payload.toUserId);
-      callPartners.set(userId, payload.toUserId);
-      callPartners.set(payload.toUserId, userId);
-      relayToUser(payload.toUserId, "call:accept", payload, userId);
-    },
-  );
+  socket.on("call:accept", (payload: { callId: string; toUserId: string }) => {
+    if (!userId || !payload?.toUserId) return;
+    usersInCall.add(userId);
+    usersInCall.add(payload.toUserId);
+    callPartners.set(userId, payload.toUserId);
+    callPartners.set(payload.toUserId, userId);
+    relayToUser(payload.toUserId, "call:accept", payload, userId);
+  });
 
-  socket.on(
-    "call:reject",
-    (payload: { callId: string; toUserId: string }) => {
-      if (!userId || !payload?.toUserId) return;
-      relayToUser(payload.toUserId, "call:reject", payload, userId);
-    },
-  );
+  socket.on("call:reject", (payload: { callId: string; toUserId: string }) => {
+    if (!userId || !payload?.toUserId) return;
+    relayToUser(payload.toUserId, "call:reject", payload, userId);
+  });
 
-  socket.on(
-    "call:end",
-    (payload: { callId: string; toUserId: string }) => {
-      if (!userId || !payload?.toUserId) return;
-      endCallForUser(userId, payload.callId);
-    },
-  );
+  socket.on("call:end", (payload: { callId: string; toUserId: string }) => {
+    if (!userId || !payload?.toUserId) return;
+    endCallForUser(userId, payload.callId);
+  });
 
-  socket.on(
-    "call:busy",
-    (payload: { callId: string; toUserId: string }) => {
-      if (!userId || !payload?.toUserId) return;
-      relayToUser(payload.toUserId, "call:busy", payload, userId);
-    },
-  );
+  socket.on("call:busy", (payload: { callId: string; toUserId: string }) => {
+    if (!userId || !payload?.toUserId) return;
+    relayToUser(payload.toUserId, "call:busy", payload, userId);
+  });
 
   socket.on(
     "webrtc:offer",
@@ -160,11 +197,7 @@ io.on("connection", (socket) => {
 
   socket.on(
     "webrtc:ice-candidate",
-    (payload: {
-      callId: string;
-      toUserId: string;
-      candidate: unknown;
-    }) => {
+    (payload: { callId: string; toUserId: string; candidate: unknown }) => {
       if (!userId || !payload?.toUserId) return;
       relayToUser(payload.toUserId, "webrtc:ice-candidate", payload, userId);
     },
@@ -174,7 +207,10 @@ io.on("connection", (socket) => {
     if (userId) {
       endCallForUser(userId);
       usersInCall.delete(userId);
-      const activeSockets = Math.max((userSocketCounts.get(userId) ?? 1) - 1, 0);
+      const activeSockets = Math.max(
+        (userSocketCounts.get(userId) ?? 1) - 1,
+        0,
+      );
       if (activeSockets === 0) {
         userSocketCounts.delete(userId);
         const lastSeen = new Date();

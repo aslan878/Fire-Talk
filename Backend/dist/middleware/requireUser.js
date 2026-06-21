@@ -14,3 +14,4 @@ function requireUser(req, res, next) {
     req.userId = id;
     next();
 }
+//# sourceMappingURL=requireUser.js.map

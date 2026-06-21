@@ -47,3 +47,4 @@ const channelSchema = new mongoose_1.default.Schema({
 channelSchema.index({ "members.user": 1 });
 channelSchema.index({ name: "text", description: "text" });
 exports.default = mongoose_1.default.model("Channel", channelSchema);
+//# sourceMappingURL=channel.js.map

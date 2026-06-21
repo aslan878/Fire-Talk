@@ -33,3 +33,4 @@ router.get("/all", requireUser_1.requireUser, async (req, res) => {
     res.json({ conversations, groups, channels });
 });
 exports.default = router;
+//# sourceMappingURL=chats-all.js.map

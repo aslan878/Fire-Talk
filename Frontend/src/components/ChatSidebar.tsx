@@ -6,6 +6,8 @@ import type { Tab, ChatItem } from "../data/types";
 import { SearchIcon, BarsIcon } from "./Icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { api } from "../services/api";
+import { useSettings } from "../contexts/SettingsContext";
+import { useModal } from "./Modal";
 import {
   faGear,
   faUser,
@@ -45,6 +47,8 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   onChatCreated,
 }) => {
   const navigate = useNavigate();
+  const { settings } = useSettings();
+  const { showAlert } = useModal();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -58,8 +62,10 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
 
   const changeScreen = (screen: "main" | "channel" | "group" | "contact") => {
     setActiveScreen(screen);
-    if (screen === "group" || screen === "channel") {
-      loadAvailableUsers("");
+    if (screen === "group") {
+      loadAvailableUsers("", true);
+      resetCreateForm();
+    } else if (screen === "channel") {
       resetCreateForm();
     } else if (screen === "contact") {
       setContactQuery("");
@@ -103,6 +109,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
     "Unknown user";
   const getLastSeenText = (user: any) => {
     if (user.status === "online") return "online";
+    if (settings.lastSeen === false) return "";
     if (!user.lastSeen) return "last seen recently";
 
     const lastSeen = new Date(user.lastSeen);
@@ -151,9 +158,9 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   }, [isDarkMode]);
 
   // Load default users when group/channel screen is opened
-  const loadAvailableUsers = async (query = "") => {
+  const loadAvailableUsers = async (query = "", connectedOnly = false) => {
     try {
-      const results = await api.users.searchUsers(query);
+      const results = await api.users.searchUsers(query, connectedOnly);
       setAvailableUsers(results);
     } catch (error) {
       console.error("Failed to load users for group selection:", error);
@@ -180,7 +187,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
 
   const handleCreateChannel = async () => {
     if (!name.trim()) {
-      alert("Please enter a channel name");
+      showAlert("Please enter a channel name");
       return;
     }
     try {
@@ -197,13 +204,13 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
       }
     } catch (error) {
       console.error("Failed to create channel:", error);
-      alert("Failed to create channel");
+      showAlert("Failed to create channel");
     }
   };
 
   const handleCreateGroup = async () => {
     if (!name.trim()) {
-      alert("Please enter a group name");
+      showAlert("Please enter a group name");
       return;
     }
     try {
@@ -220,7 +227,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
       }
     } catch (error) {
       console.error("Failed to create group:", error);
-      alert("Failed to create group");
+      showAlert("Failed to create group");
     }
   };
 
@@ -246,7 +253,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
       }
     } catch (error) {
       console.error("Failed to start direct chat:", error);
-      alert("Failed to start chat with this user");
+      showAlert("Failed to start chat with this user");
     }
   };
 
@@ -255,7 +262,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      alert("Please choose an image file");
+      showAlert("Please choose an image file");
       return;
     }
 
@@ -294,15 +301,25 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                     <FontAwesomeIcon className="menuIcon" icon={faUser} />
                     My Profile
                   </p>
-                  <p className="ItemStyle">
+                  <p className="ItemStyle"
+                    onClick={() => {
+                      navigate("/saved");
+                      setIsMenuOpen(false);
+                    }}>
                     <FontAwesomeIcon className="menuIcon" icon={faBookmark} />
                     Saved Messages
                   </p>
                   <p
                     className="ItemStyle"
-                    onClick={() => {
-                      setIsDarkMode(!isDarkMode);
+                    onClick={async () => {
+                      const newMode = !isDarkMode;
+                      setIsDarkMode(newMode);
                       setIsMenuOpen(false);
+                      try {
+                        await api.settings.updateTheme(newMode ? "dark" : "light");
+                      } catch (err) {
+                        console.error("Failed to persist theme setting:", err);
+                      }
                     }}
                   >
                     <FontAwesomeIcon
@@ -311,7 +328,13 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                     />
                     {isDarkMode ? "Light Theme" : "Dark Theme"}
                   </p>
-                  <p className="ItemStyle">
+                  <p
+                    className="ItemStyle"
+                    onClick={() => {
+                      navigate("/settings");
+                      setIsMenuOpen(false);
+                    }}
+                  >
                     <FontAwesomeIcon className="menuIcon" icon={faGear} />
                     Settings
                   </p>
@@ -395,7 +418,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                   className={`tab ${tab.isActive ? "active" : ""}`}
                   onClick={() => onTabChange && onTabChange(tab.id)}
                 >
-                  {tab.label}
+                  <span className="tab-label">{tab.label}</span>
                 </button>
               ))}
             </div>
@@ -423,7 +446,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                 if (!q) return true;
                 return (
                   chat.name.toLowerCase().includes(q) ||
-                  (chat.lastMessage && chat.lastMessage.toLowerCase().includes(q))
+                  (settings.messagePreview !== false && chat.lastMessage && chat.lastMessage.toLowerCase().includes(q))
                 );
               });
 
@@ -464,7 +487,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                     ) : (
                       chat.avatar
                     )}
-                    {chat.type === "direct" && chat.status === "online" && (
+                    {chat.type === "direct" && settings.onlineStatus !== false && chat.status === "online" && (
                       <div className="avatar-online-indicator"></div>
                     )}
                   </div>
@@ -474,7 +497,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                       <span className="chat-item-time">{chat.timestamp}</span>
                     </div>
                     <div className="chat-item-last-message">
-                      {chat.lastMessage}
+                      {chat.lastMessage ? (settings.messagePreview !== false ? chat.lastMessage : "Message") : ""}
                     </div>
                   </div>
                   {chat.unreadCount ? (
@@ -554,7 +577,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                 value={searchMemberQuery}
                 onChange={(e) => {
                   setSearchMemberQuery(e.target.value);
-                  loadAvailableUsers(e.target.value);
+                  loadAvailableUsers(e.target.value, true);
                 }}
               />
             </div>
@@ -605,7 +628,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                           type="checkbox"
                           className="panel-checkbox"
                           checked={isChecked}
-                          onChange={() => {}}
+                          onChange={() => { }}
                         />
                       </div>
                     </div>
@@ -715,74 +738,6 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                   </p>
                 </div>
               </div>
-            </div>
-
-            <div className="panel-input-group" style={{ marginTop: "5px" }}>
-              <input
-                type="text"
-                className="panel-input"
-                placeholder="Search participants..."
-                value={searchMemberQuery}
-                onChange={(e) => {
-                  setSearchMemberQuery(e.target.value);
-                  loadAvailableUsers(e.target.value);
-                }}
-              />
-            </div>
-
-            <div className="panel-subtitle">Invite participants</div>
-            <div className="panel-members-list">
-              {availableUsers.length === 0 ? (
-                <div className="panel-empty-list">
-                  No users available to add
-                </div>
-              ) : (
-                availableUsers.map((user) => {
-                  const userId = getUserId(user);
-                  const avatarUrl = getAvatarUrl(user.avatar);
-                  const isChecked = selectedUserIds.includes(userId);
-                  return (
-                    <div
-                      key={userId}
-                      className="panel-member-item"
-                      onClick={() => {
-                        if (isChecked) {
-                          setSelectedUserIds((prev) =>
-                            prev.filter((id) => id !== userId),
-                          );
-                        } else {
-                          setSelectedUserIds((prev) => [...prev, userId]);
-                        }
-                      }}
-                    >
-                      <div className="panel-member-info">
-                        {renderAvatar(
-                          getUserName(user),
-                          "var(--primary)",
-                          avatarUrl,
-                          "panel-member-avatar",
-                        )}
-                        <div className="panel-member-details">
-                          <span className="panel-member-name">
-                            {getUserName(user)}
-                          </span>
-                          <span className="panel-member-status">
-                            {getLastSeenText(user)}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="panel-checkbox-container">
-                        <input
-                          type="checkbox"
-                          className="panel-checkbox"
-                          checked={isChecked}
-                          onChange={() => {}}
-                        />
-                      </div>
-                    </div>
-                  );
-                })
-              )}
             </div>
           </div>
           <button className="panel-fab" onClick={handleCreateChannel}>

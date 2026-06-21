@@ -47,3 +47,4 @@ const groupSchema = new mongoose_1.default.Schema({
 groupSchema.index({ "members.user": 1 });
 groupSchema.index({ name: "text", description: "text" });
 exports.default = mongoose_1.default.model("Group", groupSchema);
+//# sourceMappingURL=group.js.map

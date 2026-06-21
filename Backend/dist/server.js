@@ -22,6 +22,17 @@ const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
 app.use((0, cors_1.default)({ origin: allowedOrigins }));
 app.use(express_1.default.json({ limit: "50mb" }));
 app.use(express_1.default.urlencoded({ limit: "50mb", extended: true }));
+// Health check endpoint for monitoring services
+app.get("/api/health", (req, res) => {
+    const healthCheck = {
+        status: "healthy",
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        environment: process.env.NODE_ENV || "development",
+        database: mongoose_1.default.connection.readyState === 1 ? "connected" : "disconnected",
+    };
+    res.status(200).json(healthCheck);
+});
 app.use("/api", index_1.default);
 const httpServer = (0, http_1.createServer)(app);
 const io = new socket_io_1.Server(httpServer, {
@@ -180,3 +191,4 @@ mongoose_1.default
     console.error(e);
     process.exit(1);
 });
+//# sourceMappingURL=server.js.map

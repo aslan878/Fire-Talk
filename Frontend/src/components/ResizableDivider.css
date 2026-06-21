@@ -1,0 +1,26 @@
+.resizable-divider {
+  width: 2px;
+  height: 100%;
+  background-color: var(--border);
+  cursor: col-resize;
+  touch-action: none;
+  transition: background-color 0.2s ease;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+}
+
+.resizable-divider::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -4px;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+}
+
+.resizable-divider:hover,
+.resizable-divider.resizing {
+  background-color: var(--primary);
+}

@@ -80,3 +80,4 @@ router.post("/", requireUser_1.requireUser, async (req, res) => {
     res.status(201).json(group);
 });
 exports.default = router;
+//# sourceMappingURL=groups.js.map

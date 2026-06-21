@@ -5,6 +5,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const user_1 = __importDefault(require("../models/user"));
+const conversation_1 = __importDefault(require("../models/conversation"));
+const group_1 = __importDefault(require("../models/group"));
 const requireUser_1 = require("../middleware/requireUser");
 const router = (0, express_1.Router)();
 // GET /api/users/profile
@@ -110,22 +112,47 @@ router.put("/profile", requireUser_1.requireUser, async (req, res, next) => {
 // GET /api/users/search
 router.get("/search", requireUser_1.requireUser, async (req, res, next) => {
     try {
-        const { query = "" } = req.query;
+        const { query = "", connectedOnly = "false" } = req.query;
         if (typeof query !== "string") {
             res.status(400).json({ error: "Query parameter is required" });
             return;
         }
         const term = query.trim();
-        const foundUsers = await user_1.default.find({
-            _id: { $ne: req.userId }, // Исключаем себя
-            $or: [
+        let queryCond = {
+            _id: { $ne: req.userId }, // Exclude self
+        };
+        if (connectedOnly === "true") {
+            // Find all conversations the user is in
+            const conversations = await conversation_1.default.find({ participants: req.userId }).select("participants").lean();
+            // Find all groups the user is in
+            const groups = await group_1.default.find({ "members.user": req.userId }).select("members.user").lean();
+            const connectedUserIds = new Set();
+            conversations.forEach((c) => {
+                c.participants.forEach((p) => {
+                    if (p && p.toString() !== req.userId) {
+                        connectedUserIds.add(p.toString());
+                    }
+                });
+            });
+            groups.forEach((g) => {
+                g.members.forEach((m) => {
+                    if (m && m.user && m.user.toString() !== req.userId) {
+                        connectedUserIds.add(m.user.toString());
+                    }
+                });
+            });
+            queryCond._id = { $in: Array.from(connectedUserIds) };
+        }
+        if (term) {
+            queryCond.$or = [
                 { username: { $regex: term, $options: "i" } },
                 { firstName: { $regex: term, $options: "i" } },
                 { lastName: { $regex: term, $options: "i" } },
                 { email: { $regex: term, $options: "i" } },
                 { phone: { $regex: term, $options: "i" } }
-            ]
-        }).limit(10);
+            ];
+        }
+        const foundUsers = await user_1.default.find(queryCond).limit(50);
         res.json(foundUsers.map(u => ({
             id: u._id,
             firstName: u.firstName,
@@ -141,3 +168,4 @@ router.get("/search", requireUser_1.requireUser, async (req, res, next) => {
     }
 });
 exports.default = router;
+//# sourceMappingURL=users.js.map

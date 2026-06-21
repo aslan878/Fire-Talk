@@ -7,7 +7,23 @@
     "skipLibCheck": true,
     "outDir": "dist",
     "rootDir": ".",
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "moduleResolution": "node",
+    "forceConsistentCasingInFileNames": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true,
+    "allowSyntheticDefaultImports": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
   },
-  "include": ["server.ts", "routes/**/*.ts", "middleware/**/*.ts", "models/**/*.ts"]
+  "include": [
+    "server.ts",
+    "routes/**/*.ts",
+    "middleware/**/*.ts",
+    "models/**/*.ts",
+    "services/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist"]
 }

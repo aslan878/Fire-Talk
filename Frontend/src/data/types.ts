@@ -65,6 +65,13 @@ export interface TodoPayload {
   >;
 }
 
+export interface ReplyQuote {
+  id: string;
+  text: string;
+  senderName: string;
+  kind?: MessageKind;
+}
+
 export interface Message {
   id: string;
   userId: string;
@@ -77,6 +84,8 @@ export interface Message {
   todo?: TodoPayload;
   reactions?: Reaction[];
   embed?: SpotifyEmbed;
+  replyTo?: ReplyQuote | null;
+  editedAt?: string | null;
 }
 
 export interface ChatItem {
