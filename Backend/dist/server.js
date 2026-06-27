@@ -59,8 +59,13 @@ function endCallForUser(userId, callId) {
 function relayToUser(targetUserId, event, payload, fromUserId) {
     io.to(targetUserId).emit(event, { ...payload, fromUserId });
 }
+const logSocket = (...args) => {
+    if (process.env.NODE_ENV !== "production") {
+        console.log(...args);
+    }
+};
 io.on("connection", (socket) => {
-    console.log(`User connected: ${socket.id}`);
+    logSocket(`User connected: ${socket.id}`);
     const userId = socket.handshake.auth.userId;
     if (userId) {
         socket.join(userId);
@@ -72,21 +77,54 @@ io.on("connection", (socket) => {
             status: "online",
             lastSeen: new Date().toISOString(),
         });
-        console.log(`User ${userId} joined personal room`);
+        logSocket(`User ${userId} joined personal room`);
     }
     socket.on("join_chat", (chatId) => {
         socket.join(chatId);
-        console.log(`Socket ${socket.id} joined chat ${chatId}`);
+        logSocket(`Socket ${socket.id} joined chat ${chatId}`);
+    });
+    socket.on("typing", (payload) => {
+        if (userId) {
+            socket.to(payload.chatId).emit("user_typing", {
+                chatId: payload.chatId,
+                userId,
+                username: payload.username,
+            });
+        }
+    });
+    socket.on("stop_typing", (payload) => {
+        if (userId) {
+            socket.to(payload.chatId).emit("user_stop_typing", {
+                chatId: payload.chatId,
+                userId,
+            });
+        }
+    });
+    socket.on("set_online_status_preference", async (payload) => {
+        if (!userId)
+            return;
+        try {
+            const status = payload.onlineStatus ? "online" : "offline";
+            await user_1.default.findByIdAndUpdate(userId, { status });
+            io.emit("user_status_changed", {
+                userId,
+                status,
+                lastSeen: new Date().toISOString(),
+            });
+        }
+        catch (e) {
+            console.error("Failed to update status preference:", e);
+        }
     });
     socket.on("join_qr_room", (qrToken) => {
         if (qrToken && typeof qrToken === "string") {
             socket.join(`qr_auth_${qrToken}`);
-            console.log(`Socket ${socket.id} joined QR auth room: qr_auth_${qrToken}`);
+            logSocket(`Socket ${socket.id} joined QR auth room: qr_auth_${qrToken}`);
         }
     });
     socket.on("leave_chat", (chatId) => {
         socket.leave(chatId);
-        console.log(`Socket ${socket.id} left chat ${chatId}`);
+        logSocket(`Socket ${socket.id} left chat ${chatId}`);
     });
     socket.on("call:invite", (payload) => {
         if (!userId || !payload?.toUserId || !payload?.callId)
@@ -158,7 +196,7 @@ io.on("connection", (socket) => {
                 userSocketCounts.set(userId, activeSockets);
             }
         }
-        console.log(`User disconnected: ${socket.id}`);
+        logSocket(`User disconnected: ${socket.id}`);
     });
 });
 const uri = process.env.MONGODB_URL;

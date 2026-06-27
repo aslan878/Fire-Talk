@@ -19,7 +19,10 @@ export default defineConfig({
             if (id.includes("react-router-dom")) {
               return "router";
             }
-            if (id.includes("@clerk/clerk-react") || id.includes("fontawesome")) {
+            if (
+              id.includes("@clerk/clerk-react") ||
+              id.includes("fontawesome")
+            ) {
               return "ui";
             }
             if (id.includes("socket.io-client")) {

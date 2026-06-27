@@ -407,7 +407,6 @@
   width: 34px;
   height: 34px;
   border: none;
-  border-radius: 50%;
   background: transparent;
   color: var(--text-muted);
   display: inline-flex;
@@ -415,14 +414,13 @@
   justify-content: center;
   cursor: pointer;
   font-size: 15px;
-  transition:
-    color 0.2s ease,
-    background-color 0.2s ease;
+  transition: all 0.2s ease;
   box-sizing: border-box;
   padding: 0;
 }
 
 .chat-link:hover {
+  border-radius: 50%;
   color: var(--text-main);
   background-color: color-mix(in srgb, var(--text-main) 6%, transparent);
 }
@@ -875,12 +873,6 @@
   font-size: 15px;
   outline: none;
   padding: 0;
-  resize: none;
-  overflow-y: auto;
-  min-height: 22px;
-  max-height: 140px;
-  line-height: 1.4;
-  font-family: inherit;
 }
 
 .message-input::placeholder {
@@ -1642,7 +1634,6 @@
   cursor: pointer;
   width: 36px;
   height: 36px;
-  border-radius: 50%;
   align-items: center;
   justify-content: center;
   font-size: 16px;
@@ -1651,6 +1642,7 @@
 }
 
 .chat-back-btn:hover {
+  border-radius: 50%;
   background-color: var(--bg-hover);
 }
 
@@ -1667,9 +1659,7 @@
   }
 
   .chat-sidebar,
-  .profile-container,
-  .saved-screen,
-  .settings-screen {
+  .profile-container {
     position: absolute;
     top: 0;
     left: 0;
@@ -1804,9 +1794,7 @@
 
   /* Slide States */
   .app-container:not(.chat-active) .chat-sidebar,
-  .app-container:not(.chat-active) .profile-container,
-  .app-container:not(.chat-active) .saved-screen,
-  .app-container:not(.chat-active) .settings-screen {
+  .app-container:not(.chat-active) .profile-container {
     transform: translateX(0);
   }
 
@@ -1815,26 +1803,12 @@
   }
 
   .app-container.chat-active .chat-sidebar,
-  .app-container.chat-active .profile-container,
-  .app-container.chat-active .saved-screen,
-  .app-container.chat-active .settings-screen {
+  .app-container.chat-active .profile-container {
     transform: translateX(-30%);
   }
 
   .app-container.chat-active .main-chat {
     transform: translateX(0);
-  }
-
-  /* Override slide states when settings, saved, or profile are active */
-  .app-container.subpage-active .chat-sidebar,
-  .app-container.subpage-active .profile-container,
-  .app-container.subpage-active .saved-screen,
-  .app-container.subpage-active .settings-screen {
-    transform: translateX(0) !important;
-  }
-
-  .app-container.subpage-active .main-chat {
-    transform: translateX(100%) !important;
   }
 
   /* Back Arrow Button visibility on mobile */
@@ -2341,19 +2315,25 @@ body.light-theme .search-highlight {
 }
 
 .fire-loading-pulse .auth-logo-circle {
-  box-shadow: 0 0 20px rgba(236, 51, 51, 0.4);
+  box-shadow: 0 0 20px
+    color-mix(in srgb, var(--logo-color, #ec3333) 45%, transparent);
   transition: box-shadow 0.3s ease;
 }
 
 @keyframes fire-pulse-glow {
   0% {
     transform: scale(0.95);
-    filter: drop-shadow(0 0 15px rgba(236, 51, 51, 0.4));
+    filter: drop-shadow(
+      0 0 15px color-mix(in srgb, var(--logo-color, #ec3333) 45%, transparent)
+    );
   }
 
   50% {
     transform: scale(1.06);
-    filter: drop-shadow(0 0 35px rgba(236, 85, 51, 0.9)) brightness(1.15);
+    filter: drop-shadow(
+        0 0 35px color-mix(in srgb, var(--logo-color, #ec3333) 85%, transparent)
+      )
+      brightness(1.15);
   }
 
   100% {
@@ -2682,23 +2662,6 @@ body.light-theme .search-highlight {
   border-bottom: 1px solid var(--popup-border);
 }
 
-.emoji-picker-search-input {
-  width: 100%;
-  background-color: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 6px 12px;
-  color: var(--text-main);
-  outline: none;
-  font-size: 13px;
-  transition: all 0.2s ease;
-}
-
-.emoji-picker-search-input:focus {
-  border-color: var(--primary);
-  background-color: rgba(0, 0, 0, 0.2);
-}
-
 .emoji-picker-tabs {
   display: flex;
   padding: 4px 8px;
@@ -2715,9 +2678,9 @@ body.light-theme .search-highlight {
   font-size: 18px;
   padding: 6px 0;
   cursor: pointer;
-  border-radius: 8px;
   transition: all 0.2s ease;
   min-width: 32px;
+  border-radius: 8px;
 }
 
 .emoji-picker-tab-btn:hover {
@@ -2732,6 +2695,39 @@ body.light-theme .search-highlight {
   flex: 1;
   overflow-y: auto;
   padding: 10px;
+}
+.emoji-picker-toggle-btn {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.emoji-picker-toggle-btn:hover {
+  border-radius: 50%;
+}
+.jump-to-bottom-btn {
+  position: absolute;
+  bottom: 72px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(144, 144, 144, 0.171);
+  color: white;
+  border: none;
+  cursor: pointer;
+  backdrop-filter: blur(var(--popup-blur));
+  border: 1px solid var(--popup-border);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
+  transition: all 0.3s ease;
+}
+.jump-to-bottom-btn:hover {
+  background: var(--popup-item-hover-bg);
+  color: var(--popup-item-hover-color);
 }
 
 /* Custom Scrollbar for Emoji Picker */
@@ -3089,9 +3085,18 @@ body.compact-mode .tabs {
 
 /* ── Message highlight pulse (navigate-to from saved) ─────────────────────── */
 @keyframes messageHighlightPulse {
-  0%   { background-color: color-mix(in srgb, var(--primary) 36%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 28%, transparent); }
-  50%  { background-color: color-mix(in srgb, var(--primary) 20%, transparent); box-shadow: 0 0 0 6px color-mix(in srgb, var(--primary) 10%, transparent); }
-  100% { background-color: transparent; box-shadow: none; }
+  0% {
+    background-color: color-mix(in srgb, var(--primary) 36%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 28%, transparent);
+  }
+  50% {
+    background-color: color-mix(in srgb, var(--primary) 20%, transparent);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--primary) 10%, transparent);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
 }
 
 .message-highlight-pulse .message-bubble::before {
@@ -3106,242 +3111,3 @@ body.compact-mode .tabs {
   animation: messageHighlightPulse 1.8s ease-out forwards;
   z-index: 1;
 }
-
-/* ── Reply Preview Bar ────────────────────────────────────────── */
-.reply-preview-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--bg-hover);
-  border-left: 3px solid var(--primary);
-  padding: 8px 12px;
-  margin-bottom: 8px;
-  border-radius: 8px;
-  gap: 12px;
-  backdrop-filter: blur(10px);
-  animation: slideDownFade 0.2s ease-out;
-}
-
-.reply-preview-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.reply-preview-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--primary-hover);
-  margin-bottom: 2px;
-}
-
-.reply-preview-sender {
-  font-weight: 700;
-  color: var(--text-main);
-}
-
-.reply-preview-text {
-  font-size: 12px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.reply-preview-close {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: all 0.2s ease;
-}
-
-.reply-preview-close:hover {
-  background: var(--bg-darker);
-  color: var(--text-main);
-}
-
-/* ── Reply Quote Inside Message ───────────────────────────────── */
-.message-reply-quote {
-  background: color-mix(in srgb, var(--primary) 12%, var(--bg-darker));
-  border-left: 3px solid var(--primary);
-  padding: 6px 10px;
-  border-radius: 6px;
-  margin-bottom: 6px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  user-select: none;
-}
-
-.message.own .message-reply-quote {
-  background: color-mix(in srgb, white 15%, rgba(0, 0, 0, 0.25));
-  border-left-color: white;
-}
-
-.reply-quote-sender {
-  font-weight: 600;
-  color: var(--primary-hover);
-  font-size: 12px;
-  margin-bottom: 2px;
-}
-
-.message.own .reply-quote-sender {
-  color: white;
-  opacity: 0.9;
-}
-
-.reply-quote-text {
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 12px;
-}
-
-.message.own .reply-quote-text {
-  color: rgba(255, 255, 255, 0.8);
-}
-
-/* ── Inline Edit Mode ─────────────────────────────────────────── */
-.message-edit-container {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: min(280px, 60vw);
-}
-
-.message-edit-input {
-  background: color-mix(in srgb, var(--primary) 5%, var(--bg-darker));
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text-main);
-  font-family: inherit;
-  font-size: 15px;
-  padding: 8px;
-  resize: none;
-  min-height: 40px;
-  outline: none;
-  line-height: 1.4;
-}
-
-.message.own .message-edit-input {
-  background: rgba(0, 0, 0, 0.2);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: white;
-}
-
-.message-edit-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.btn-edit-cancel,
-.btn-edit-save {
-  padding: 6px 12px;
-  font-size: 13px;
-  font-weight: 500;
-  border-radius: 6px;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s ease;
-}
-
-.btn-edit-cancel {
-  background: var(--bg-hover);
-  color: var(--text-main);
-}
-
-.btn-edit-cancel:hover {
-  background: var(--bg-darker);
-}
-
-.btn-edit-save {
-  background: var(--primary);
-  color: white;
-}
-
-.btn-edit-save:hover {
-  background: var(--primary-hover);
-}
-
-.message.own .btn-edit-cancel {
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
-}
-
-.message.own .btn-edit-cancel:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.message.own .btn-edit-save {
-  background: white;
-  color: var(--primary);
-  font-weight: 600;
-}
-
-.message.own .btn-edit-save:hover {
-  background: rgba(255, 255, 255, 0.9);
-}
-
-.message-edited-label {
-  font-size: 11px;
-  color: var(--text-muted);
-  opacity: 0.7;
-  margin-right: 6px;
-  user-select: none;
-}
-
-.message.own .message-edited-label {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-/* ── Jump To Bottom Button ────────────────────────────────────── */
-.jump-to-bottom-btn {
-  position: absolute;
-  bottom: 85px;
-  right: 24px;
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: var(--popup-bg);
-  border: 1px solid var(--popup-border);
-  color: var(--text-main);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 99;
-  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  animation: popIn 0.25s ease-out;
-}
-
-.jump-to-bottom-btn:hover {
-  transform: translateY(-2px) scale(1.05);
-  background: var(--bg-hover);
-  border-color: var(--primary);
-  color: var(--primary-hover);
-}
-
-.jump-to-bottom-btn:active {
-  transform: scale(0.95);
-}
-
-@keyframes popIn {
-  0% {
-    transform: scale(0) rotate(-45deg);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(1) rotate(0);
-    opacity: 1;
-  }
-}
-

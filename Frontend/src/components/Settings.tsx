@@ -18,6 +18,7 @@ const defaultSettings: UserSettings = {
   userId: "",
   // Appearance & Chat Settings
   theme: "dark",
+  appearanceTheme: "system",
   language: "en",
   fontSize: "medium",
   compactMode: false,
@@ -95,13 +96,6 @@ const Settings = () => {
     setSaving(true);
     setError(null);
 
-    if (updates.theme !== undefined) {
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      const shouldUseDark = updates.theme === "dark" || (updates.theme === "auto" && prefersDark);
-      document.body.classList.toggle("light-theme", !shouldUseDark);
-      localStorage.setItem("theme", shouldUseDark ? "dark" : "light");
-    }
-
     if (updates.fontSize) {
       document.body.className = document.body.className.replace(
         /font-\w+/g,
@@ -176,22 +170,6 @@ const Settings = () => {
               <div className="settings-section-title">
                 <FontAwesomeIcon icon={faPalette} />
                 Appearance & Chat Settings
-              </div>
-
-              <div className="settings-row">
-                <span>Theme</span>
-                <select
-                  value={settings.theme || "dark"}
-                  onChange={(e) =>
-                    void updateSettings({
-                      theme: e.target.value as UserSettings["theme"],
-                    })
-                  }
-                >
-                  <option value="dark">Dark Theme</option>
-                  <option value="light">Light Theme</option>
-                  <option value="auto">System Default (Auto)</option>
-                </select>
               </div>
 
               <div className="settings-row">

@@ -25,20 +25,18 @@
   width: 36px;
   height: 36px;
   border: none;
-  border-radius: 50%;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition:
-    color 0.2s ease,
-    background-color 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .saved-back-btn:hover,
 .settings-back-btn:hover {
+  border-radius: 50%;
   color: var(--text-main);
   background: var(--bg-hover);
 }
@@ -91,7 +89,7 @@
   padding: 12px;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg-panel) 68%, transparent);
+  background: color-mix(in srgb, var(--bg-panel) 84%, transparent);
   margin-bottom: 10px;
   cursor: pointer;
   transition:
@@ -234,4 +232,27 @@
 
 .saved-item:hover .saved-goto-badge {
   opacity: 1;
+}
+
+/* Mobile responsive styles for full-screen mode */
+@media (max-width: 768px) {
+  .saved-screen,
+  .settings-screen {
+    width: 100vw;
+    height: 100vh;
+  }
+
+  .saved-header,
+  .settings-header {
+    height: 56px;
+  }
+
+  .saved-list,
+  .settings-content {
+    padding: 12px;
+  }
+
+  .saved-item {
+    margin-bottom: 8px;
+  }
 }

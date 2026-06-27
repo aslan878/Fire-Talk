@@ -15,12 +15,11 @@ import {
   faPlus,
   faBullhorn,
   faUsers,
-  faMoon,
-  faLightbulb,
+  faPalette,
+  faCheck,
   faSignOutAlt,
   faArrowLeft,
   faCamera,
-  faCheck,
   faGlobe,
   faLock,
 } from "@fortawesome/free-solid-svg-icons";
@@ -51,9 +50,6 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   const { showAlert } = useModal();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    return localStorage.getItem("theme") !== "light";
-  });
 
   // Screen States
   const [activeScreen, setActiveScreen] = useState<
@@ -146,16 +142,6 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
       )}
     </div>
   );
-
-  useEffect(() => {
-    if (isDarkMode) {
-      document.body.classList.remove("light-theme");
-      localStorage.setItem("theme", "dark");
-    } else {
-      document.body.classList.add("light-theme");
-      localStorage.setItem("theme", "light");
-    }
-  }, [isDarkMode]);
 
   // Load default users when group/channel screen is opened
   const loadAvailableUsers = async (query = "", connectedOnly = false) => {
@@ -311,22 +297,13 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                   </p>
                   <p
                     className="ItemStyle"
-                    onClick={async () => {
-                      const newMode = !isDarkMode;
-                      setIsDarkMode(newMode);
+                    onClick={() => {
+                      navigate("/appearance");
                       setIsMenuOpen(false);
-                      try {
-                        await api.settings.updateTheme(newMode ? "dark" : "light");
-                      } catch (err) {
-                        console.error("Failed to persist theme setting:", err);
-                      }
                     }}
                   >
-                    <FontAwesomeIcon
-                      className="menuIcon"
-                      icon={isDarkMode ? faLightbulb : faMoon}
-                    />
-                    {isDarkMode ? "Light Theme" : "Dark Theme"}
+                    <FontAwesomeIcon className="menuIcon" icon={faPalette} />
+                    Appearance
                   </p>
                   <p
                     className="ItemStyle"

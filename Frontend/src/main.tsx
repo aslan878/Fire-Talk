@@ -5,8 +5,11 @@ import App from './App.tsx'
 import { ClerkProvider } from '@clerk/clerk-react'
 import { SettingsProvider } from './contexts/SettingsContext.tsx'
 import { ModalProvider } from './components/Modal.tsx'
+import { applyAppearanceTheme } from './utils/theme.ts'
 
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '';
+
+applyAppearanceTheme();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -44,4 +47,3 @@ createRoot(document.getElementById('root')!).render(
     </SettingsProvider>
   </StrictMode>,
 )
-

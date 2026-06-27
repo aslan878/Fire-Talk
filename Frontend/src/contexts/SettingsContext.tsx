@@ -6,6 +6,7 @@ const defaultSettings: UserSettings = {
   _id: "",
   userId: "",
   theme: "dark",
+  appearanceTheme: "system",
   language: "en",
   fontSize: "medium",
   compactMode: false,

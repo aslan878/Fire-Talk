@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Profile.css";
@@ -10,22 +11,39 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { api } from "../services/api";
 
-// Cute green alien avatar with red cap and blue background - matches the screenshot perfectly!
-const DEFAULT_AVATAR = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%230066cc"/><circle cx="50" cy="78" r="28" fill="%2310b981"/><circle cx="50" cy="46" r="22" fill="%2310b981"/><path d="M 32 32 L 68 32 Q 50 14 32 32 Z" fill="%23ef4444"/><circle cx="50" cy="18" r="5" fill="%23ef4444"/><circle cx="42" cy="42" r="4" fill="white"/><circle cx="58" cy="42" r="4" fill="white"/><circle cx="42" cy="42" r="2" fill="black"/><circle cx="58" cy="42" r="2" fill="black"/><path d="M 44 54 Q 50 58 56 54" stroke="white" stroke-width="2" stroke-linecap="round" fill="none"/></svg>`;
+const DEFAULT_AVATAR = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="%23171a20"/><circle cx="50" cy="38" r="16" fill="%232a303a"/><path d="M22 86c5-14 17-22 28-22s23 8 28 22" fill="%232a303a"/><circle cx="50" cy="50" r="42" fill="none" stroke="%23353b46" stroke-width="2"/></svg>`;
 
 const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 const RU_TO_EN_MONTHS: Record<string, string> = {
-  "января": "January", "февраля": "February", "марта": "March", "апреля": "April",
-  "мая": "May", "июня": "June", "июля": "July", "августа": "August",
-  "сентября": "September", "октября": "October", "ноября": "November", "декабря": "December"
+  января: "January",
+  февраля: "February",
+  марта: "March",
+  апреля: "April",
+  мая: "May",
+  июня: "June",
+  июля: "July",
+  августа: "August",
+  сентября: "September",
+  октября: "October",
+  ноября: "November",
+  декабря: "December",
 };
 
-interface ProfileProps {
-}
+type ProfileProps = object;
 
 const Profile: React.FC<ProfileProps> = () => {
   const navigate = useNavigate();
@@ -42,7 +60,9 @@ const Profile: React.FC<ProfileProps> = () => {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [savingStatus, setSavingStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [savingStatus, setSavingStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -81,7 +101,8 @@ const Profile: React.FC<ProfileProps> = () => {
           localStorage.setItem("user_avatar", data.avatar);
         }
 
-        const fullName = `${data.firstName || ""} ${data.lastName || ""}`.trim() || "Aslan";
+        const fullName =
+          `${data.firstName || ""} ${data.lastName || ""}`.trim() || "Aslan";
         if (chatUserStr) {
           try {
             const parsed = JSON.parse(chatUserStr);
@@ -90,12 +111,14 @@ const Profile: React.FC<ProfileProps> = () => {
               localStorage.setItem("chat_user", JSON.stringify(parsed));
               window.dispatchEvent(new Event("storage"));
             }
-          } catch (e) { }
+          } catch (e) {
+            // ignore JSON parse error
+          }
         }
-
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
         console.error(err);
-        setError(err.message || "Failed to load profile from server");
+        setError(errMsg || "Failed to load profile from server");
       } finally {
         setLoading(false);
       }
@@ -137,9 +160,12 @@ const Profile: React.FC<ProfileProps> = () => {
 
       // If name was updated, sync it with localStorage's `chat_user` so layout elements update instantly!
       if (updates.firstName !== undefined || updates.lastName !== undefined) {
-        const currentFirstName = updates.firstName !== undefined ? updates.firstName : firstName;
-        const currentLastName = updates.lastName !== undefined ? updates.lastName : lastName;
-        const fullName = `${currentFirstName} ${currentLastName}`.trim() || "Aslan";
+        const currentFirstName =
+          updates.firstName !== undefined ? updates.firstName : firstName;
+        const currentLastName =
+          updates.lastName !== undefined ? updates.lastName : lastName;
+        const fullName =
+          `${currentFirstName} ${currentLastName}`.trim() || "Aslan";
 
         if (chatUserStr) {
           try {
@@ -147,19 +173,25 @@ const Profile: React.FC<ProfileProps> = () => {
             parsed.name = fullName;
             localStorage.setItem("chat_user", JSON.stringify(parsed));
             window.dispatchEvent(new Event("storage"));
-          } catch (e) { }
+          } catch (e) {
+            // ignore JSON parse error
+          }
         }
       }
 
       // Sync legacy localStorage keys
-      if (updates.bio !== undefined) localStorage.setItem("user_bio", updates.bio);
-      if (updates.birthday !== undefined) localStorage.setItem("user_birthday", updates.birthday);
-      if (updates.username !== undefined) localStorage.setItem("user_username", updates.username);
-      if (updates.avatar !== undefined && updates.avatar !== null) localStorage.setItem("user_avatar", updates.avatar);
-
-    } catch (err: any) {
+      if (updates.bio !== undefined)
+        localStorage.setItem("user_bio", updates.bio);
+      if (updates.birthday !== undefined)
+        localStorage.setItem("user_birthday", updates.birthday);
+      if (updates.username !== undefined)
+        localStorage.setItem("user_username", updates.username);
+      if (updates.avatar !== undefined && updates.avatar !== null)
+        localStorage.setItem("user_avatar", updates.avatar);
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
       console.error(err);
-      setError(err.message || "Failed to save updates");
+      setError(errMsg || "Failed to save updates");
       setSavingStatus("error");
     }
   };
@@ -203,10 +235,10 @@ const Profile: React.FC<ProfileProps> = () => {
   };
 
   const parseBirthdayString = (bStr: string) => {
-    if (!bStr) return { day: "16", month: "February", year: "" };
+    if (!bStr) return { day: "1", month: "January", year: "" };
     const parts = bStr.split(" ");
-    const day = parts[0] || "16";
-    let month = parts[1] || "February";
+    const day = parts[0] || "1";
+    let month = parts[1] || "January";
     if (RU_TO_EN_MONTHS[month]) {
       month = RU_TO_EN_MONTHS[month];
     }
@@ -222,25 +254,68 @@ const Profile: React.FC<ProfileProps> = () => {
     setIsEditingBirthday(true);
   };
 
+  const getDaysInMonth = (month: string, year: string): number => {
+    const monthIndex = MONTHS.indexOf(month);
+    if (monthIndex === -1) return 31;
+
+    const y = year ? parseInt(year, 10) : new Date().getFullYear();
+    const daysInMonths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+    // Check for leap year
+    if (monthIndex === 1 && ((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0)) {
+      return 29;
+    }
+
+    return daysInMonths[monthIndex];
+  };
+
+  const validateDay = (day: string, month: string, year: string): string => {
+    if (!day) return "";
+    const dayNum = parseInt(day, 10);
+    if (isNaN(dayNum) || dayNum < 1) return "1";
+    const maxDays = getDaysInMonth(month, year);
+    if (dayNum > maxDays) return maxDays.toString();
+    return day;
+  };
+
+  const validateYear = (year: string): string => {
+    if (!year) return "";
+    const yearNum = parseInt(year, 10);
+    if (isNaN(yearNum)) return "";
+    const currentYear = new Date().getFullYear();
+    // Only constrain if it's a complete 4-digit year
+    if (year.length === 4) {
+      if (yearNum < 1900) return "1900";
+      if (yearNum > currentYear) return currentYear.toString();
+    }
+    return year;
+  };
+
   const handleDayInputChange = (val: string) => {
     const clean = val.replace(/\D/g, "").slice(0, 2);
-    setSelDay(clean);
-    const formatted = `${clean} ${selMonth}${selYear ? ` ${selYear}` : ""}`;
+    const validated = validateDay(clean, selMonth, selYear);
+    setSelDay(validated);
+    const formatted = `${validated} ${selMonth}${selYear ? ` ${selYear}` : ""}`;
     setBirthday(formatted);
     saveProfile({ birthday: formatted });
   };
 
   const handleMonthSelectChange = (newMonth: string) => {
     setSelMonth(newMonth);
-    const formatted = `${selDay} ${newMonth}${selYear ? ` ${selYear}` : ""}`;
+    const validated = validateDay(selDay, newMonth, selYear);
+    setSelDay(validated);
+    const formatted = `${validated} ${newMonth}${selYear ? ` ${selYear}` : ""}`;
     setBirthday(formatted);
     saveProfile({ birthday: formatted });
   };
 
   const handleYearInputChange = (val: string) => {
     const clean = val.replace(/\D/g, "").slice(0, 4);
-    setSelYear(clean);
-    const formatted = `${selDay} ${selMonth}${clean ? ` ${clean}` : ""}`;
+    const validated = validateYear(clean);
+    setSelYear(validated);
+    const dayValidated = validateDay(selDay, selMonth, validated);
+    setSelDay(dayValidated);
+    const formatted = `${dayValidated} ${selMonth}${validated ? ` ${validated}` : ""}`;
     setBirthday(formatted);
     saveProfile({ birthday: formatted });
   };
@@ -249,7 +324,11 @@ const Profile: React.FC<ProfileProps> = () => {
     return (
       <div className="profile">
         <div className="profile-top-header">
-          <button className="back-arrow-btn" onClick={() => navigate("/")} aria-label="Back">
+          <button
+            className="back-arrow-btn"
+            onClick={() => navigate("/")}
+            aria-label="Back"
+          >
             <FontAwesomeIcon icon={faArrowLeft} />
           </button>
           <span className="profile-header-title">Edit Profile</span>
@@ -265,13 +344,23 @@ const Profile: React.FC<ProfileProps> = () => {
   return (
     <div className="profile">
       <div className="profile-top-header" style={{ position: "relative" }}>
-        <button className="back-arrow-btn" onClick={() => navigate("/")} aria-label="Back">
+        <button
+          className="back-arrow-btn"
+          onClick={() => navigate("/")}
+          aria-label="Back"
+        >
           <FontAwesomeIcon icon={faArrowLeft} />
         </button>
         <span className="profile-header-title">Edit Profile</span>
-        {savingStatus === "saving" && <div className="profile-saving-status">Saving...</div>}
-        {savingStatus === "saved" && <div className="profile-saving-status saved">Saved</div>}
-        {savingStatus === "error" && <div className="profile-saving-status error">Error</div>}
+        {savingStatus === "saving" && (
+          <div className="profile-saving-status">Saving...</div>
+        )}
+        {savingStatus === "saved" && (
+          <div className="profile-saving-status saved">Saved</div>
+        )}
+        {savingStatus === "error" && (
+          <div className="profile-saving-status error">Error</div>
+        )}
       </div>
 
       {error && <div className="profile-error-banner">{error}</div>}
@@ -337,11 +426,16 @@ const Profile: React.FC<ProfileProps> = () => {
           </div>
 
           <p className="field-desc-text">
-            Any details such as age, occupation or city. Example: 23 years old, designer from San Francisco.
+            Any details such as age, occupation or city. Example: 23 years old,
+            designer from San Francisco.
           </p>
 
           <div className="birthday-card">
-            <div className="birthday-row" onClick={startEditingBirthday} style={{ cursor: "pointer" }}>
+            <div
+              className="birthday-row"
+              onClick={startEditingBirthday}
+              style={{ cursor: "pointer" }}
+            >
               <div className="birthday-icon-box">
                 <FontAwesomeIcon icon={faGift} />
               </div>
@@ -352,7 +446,10 @@ const Profile: React.FC<ProfileProps> = () => {
             </div>
 
             {isEditingBirthday && (
-              <div className="birthday-select-container" onClick={(e) => e.stopPropagation()}>
+              <div
+                className="birthday-select-container"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <input
                   type="text"
                   pattern="[0-9]*"
@@ -369,7 +466,11 @@ const Profile: React.FC<ProfileProps> = () => {
                   value={selMonth}
                   onChange={(e) => handleMonthSelectChange(e.target.value)}
                 >
-                  {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+                  {MONTHS.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
                 </select>
 
                 <input
@@ -382,12 +483,11 @@ const Profile: React.FC<ProfileProps> = () => {
                   value={selYear}
                   onChange={(e) => handleYearInputChange(e.target.value)}
                 />
-
-
               </div>
             )}
             <p className="birthday-desc-text">
-              You can choose who can see your birthday in <span className="settings-highlight">Settings &gt;</span>.
+              You can choose who can see your birthday in{" "}
+              <span className="settings-highlight">Settings &gt;</span>.
             </p>
           </div>
 

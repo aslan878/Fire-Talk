@@ -151,5 +151,6 @@ const userSchema = new mongoose_1.default.Schema({
 }, {
     timestamps: true,
 });
+userSchema.index({ status: 1 });
 exports.default = mongoose_1.default.model("User", userSchema);
 //# sourceMappingURL=user.js.map

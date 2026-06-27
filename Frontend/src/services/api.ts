@@ -161,11 +161,23 @@ export interface SavedMessage {
   savedAt: string;
 }
 
+export type AppearanceTheme =
+  | "system"
+  | "white"
+  | "black"
+  | "sunset"
+  | "lavender"
+  | "mint"
+  | "midnight"
+  | "blossom"
+  | "gold";
+
 export interface UserSettings {
   _id: string;
   userId: string;
   // Appearance & Chat Settings
   theme?: "light" | "dark" | "auto";
+  appearanceTheme?: AppearanceTheme;
   language?: string;
   fontSize?: "small" | "medium" | "large";
   compactMode?: boolean;

@@ -59,50 +59,45 @@ router.post("/register", async (req, res, next) => {
         const trimmedFirstName = firstName.trim();
         const trimmedLastName = typeof lastName === "string" ? lastName.trim() : "";
         const trimmedUsername = typeof username === "string" ? username.trim() : "";
+        const conditions = [];
+        if (trimmedEmail)
+            conditions.push({ email: trimmedEmail });
+        if (trimmedPhone)
+            conditions.push({ phone: trimmedPhone });
+        if (trimmedUsername)
+            conditions.push({ username: trimmedUsername });
         let user = null;
-        if (trimmedEmail) {
-            user = await user_1.default.findOne({ email: trimmedEmail });
-        }
-        else if (trimmedPhone) {
-            user = await user_1.default.findOne({ phone: trimmedPhone });
-        }
-        if (user) {
-            if (trimmedUsername && trimmedUsername !== user.username) {
-                const existingUsername = await user_1.default.findOne({ username: trimmedUsername });
-                if (existingUsername && existingUsername._id.toString() !== user._id.toString()) {
-                    res.status(400).json({ error: "This username is already taken" });
-                    return;
-                }
+        const existingUsers = conditions.length > 0 ? await user_1.default.find({ $or: conditions }) : [];
+        const targetUser = existingUsers.find(u => (trimmedEmail && u.email === trimmedEmail) || (trimmedPhone && u.phone === trimmedPhone));
+        const usernameConflict = trimmedUsername
+            ? existingUsers.find(u => u.username === trimmedUsername)
+            : null;
+        if (targetUser) {
+            if (usernameConflict && usernameConflict._id.toString() !== targetUser._id.toString()) {
+                res.status(400).json({ error: "This username is already taken" });
+                return;
             }
-            user.firstName = trimmedFirstName;
-            user.lastName = trimmedLastName;
+            targetUser.firstName = trimmedFirstName;
+            targetUser.lastName = trimmedLastName;
             if (trimmedUsername) {
-                user.username = trimmedUsername;
+                targetUser.username = trimmedUsername;
             }
-            user.status = "online";
-            await user.save();
+            targetUser.status = "online";
+            await targetUser.save();
+            user = targetUser;
         }
         else {
-            if (trimmedPhone) {
-                const existingPhone = await user_1.default.findOne({ phone: trimmedPhone });
-                if (existingPhone) {
-                    res.status(400).json({ error: "This phone number is already registered" });
-                    return;
-                }
+            if (trimmedPhone && existingUsers.some(u => u.phone === trimmedPhone)) {
+                res.status(400).json({ error: "This phone number is already registered" });
+                return;
             }
-            if (trimmedEmail) {
-                const existingEmail = await user_1.default.findOne({ email: trimmedEmail });
-                if (existingEmail) {
-                    res.status(400).json({ error: "This email is already registered" });
-                    return;
-                }
+            if (trimmedEmail && existingUsers.some(u => u.email === trimmedEmail)) {
+                res.status(400).json({ error: "This email is already registered" });
+                return;
             }
-            if (trimmedUsername) {
-                const existingUsername = await user_1.default.findOne({ username: trimmedUsername });
-                if (existingUsername) {
-                    res.status(400).json({ error: "This username is already taken" });
-                    return;
-                }
+            if (trimmedUsername && usernameConflict) {
+                res.status(400).json({ error: "This username is already taken" });
+                return;
             }
             user = await user_1.default.create({
                 phone: trimmedPhone || undefined,
@@ -515,6 +510,10 @@ router.post("/clerk", async (req, res, next) => {
                 user.avatar = { url: avatarUrl, publicId: null };
                 hasChanges = true;
             }
+            if (user.status !== "online") {
+                user.status = "online";
+                hasChanges = true;
+            }
             if (hasChanges) {
                 await user.save();
             }
@@ -532,8 +531,6 @@ router.post("/clerk", async (req, res, next) => {
                 status: "online",
             });
         }
-        user.status = "online";
-        await user.save();
         const { accessToken, refreshToken } = (0, jwt_1.generateTokens)({ userId: user._id.toString() });
         res.json({
             success: true,

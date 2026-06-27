@@ -5,7 +5,7 @@ import type {
   MessageAttachment,
   MessageKind,
 } from "../data/types";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { api } from "../services/api";
 import { EmojiPicker } from "./EmojiPicker";
 import { VoicePlayer } from "./VoicePlayer";
@@ -41,10 +41,10 @@ import {
   faTrash,
   faXmark,
   faSearch,
-  faCheck,
   faCheckDouble,
   faPen,
   faReply,
+  faTrashCan,
 } from "@fortawesome/free-solid-svg-icons";
 import { useSettings } from "../contexts/SettingsContext";
 import { useModal } from "./Modal";
@@ -71,11 +71,11 @@ export interface SendMessagePayload {
   todo?: {
     title: string;
     items:
-    | string[]
-    | Array<{
-      text: string;
-      completedBy?: Array<{ userId: string; completedAt?: string }>;
-    }>;
+      | string[]
+      | Array<{
+          text: string;
+          completedBy?: Array<{ userId: string; completedAt?: string }>;
+        }>;
   };
   replyTo?: string;
 }
@@ -169,9 +169,11 @@ export const MainChat: React.FC<MainChatProps> = ({
 
   // Typing state tracking refs
   const isTypingRef = useRef(false);
-  const stopTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stopTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
-  const clearTypingStatus = () => {
+  const clearTypingStatus = useCallback(() => {
     if (isTypingRef.current) {
       isTypingRef.current = false;
       if (onStopTyping) onStopTyping();
@@ -180,16 +182,14 @@ export const MainChat: React.FC<MainChatProps> = ({
       clearTimeout(stopTypingTimeoutRef.current);
       stopTypingTimeoutRef.current = null;
     }
-  };
+  }, [onStopTyping]);
 
   useEffect(() => {
     // Stop typing when switching chats or unmounting
     return () => {
       clearTypingStatus();
     };
-  }, [activeChat]);
-
-
+  }, [activeChat, clearTypingStatus]);
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -198,9 +198,7 @@ export const MainChat: React.FC<MainChatProps> = ({
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [muted, setMuted] = useState(false);
-  const [contextMessageId, setContextMessageId] = useState<string | null>(
-    null,
-  );
+  const [contextMessageId, setContextMessageId] = useState<string | null>(null);
   const [copyToast, setCopyToast] = useState(false);
   const [saveToast, setSaveToast] = useState(false);
   const [pinnedPreviewDismissed, setPinnedPreviewDismissed] = useState(false);
@@ -210,10 +208,17 @@ export const MainChat: React.FC<MainChatProps> = ({
   const [recordingTime, setRecordingTime] = useState(0);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
-  const [audioLevels, setAudioLevels] = useState<number[]>(new Array(24).fill(0));
+  const [audioLevels, setAudioLevels] = useState<number[]>(
+    new Array(24).fill(0),
+  );
 
   // Reply-to state
-  const [replyingTo, setReplyingTo] = useState<{ id: string; text: string; senderName: string; kind?: string } | null>(null);
+  const [replyingTo, setReplyingTo] = useState<{
+    id: string;
+    text: string;
+    senderName: string;
+    kind?: string;
+  } | null>(null);
 
   // Edit message state
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -225,7 +230,9 @@ export const MainChat: React.FC<MainChatProps> = ({
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const recordingIntervalRef = useRef<any>(null);
+  const recordingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
 
   const isLockedRef = useRef(false);
   const shouldStopRecordingRef = useRef(false);
@@ -318,7 +325,9 @@ export const MainChat: React.FC<MainChatProps> = ({
       }
     } catch (err) {
       console.error("Failed to start voice recording:", err);
-      showAlert("Could not access microphone. Please allow microphone access in your browser settings.");
+      showAlert(
+        "Could not access microphone. Please allow microphone access in your browser settings.",
+      );
       setIsRecording(false);
       setIsLocked(false);
       isLockedRef.current = false;
@@ -340,7 +349,7 @@ export const MainChat: React.FC<MainChatProps> = ({
     // Clean up audio analyser
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     if (audioContextRef.current) {
-      audioContextRef.current.close().catch(() => { });
+      audioContextRef.current.close().catch(() => {});
       audioContextRef.current = null;
     }
     analyserRef.current = null;
@@ -348,7 +357,7 @@ export const MainChat: React.FC<MainChatProps> = ({
 
     recorder.onstop = () => {
       const audioBlob = new Blob(audioChunksRef.current, {
-        type: recorder.mimeType || "audio/webm"
+        type: recorder.mimeType || "audio/webm",
       });
 
       if (recorder.stream) {
@@ -398,7 +407,7 @@ export const MainChat: React.FC<MainChatProps> = ({
     // Clean up audio analyser
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     if (audioContextRef.current) {
-      audioContextRef.current.close().catch(() => { });
+      audioContextRef.current.close().catch(() => {});
       audioContextRef.current = null;
     }
     analyserRef.current = null;
@@ -431,7 +440,7 @@ export const MainChat: React.FC<MainChatProps> = ({
 
     void startRecording();
 
-    const handleRelease = (_ev: MouseEvent | TouchEvent) => {
+    const handleRelease = () => {
       window.removeEventListener("mouseup", handleRelease);
       window.removeEventListener("touchend", handleRelease);
       window.removeEventListener("mousemove", handleMove);
@@ -478,12 +487,15 @@ export const MainChat: React.FC<MainChatProps> = ({
       if (recordingIntervalRef.current) {
         window.clearInterval(recordingIntervalRef.current);
       }
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      if (
+        mediaRecorderRef.current &&
+        mediaRecorderRef.current.state !== "inactive"
+      ) {
         mediaRecorderRef.current.stop();
       }
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       if (audioContextRef.current) {
-        audioContextRef.current.close().catch(() => { });
+        audioContextRef.current.close().catch(() => {});
       }
     };
   }, []);
@@ -528,11 +540,11 @@ export const MainChat: React.FC<MainChatProps> = ({
           });
         }
       },
-      { confirmText: "Delete", danger: true, title: "Delete Message" }
+      { confirmText: "Delete", danger: true, title: "Delete Message" },
     );
   };
 
-  useEffect(() => {
+  const initializeChat = useCallback(() => {
     setPinnedIds(loadPinnedIds(chatId));
     setMuted(isChatMuted(chatId));
     setSearchOpen(false);
@@ -543,9 +555,14 @@ export const MainChat: React.FC<MainChatProps> = ({
     setPinnedPreviewDismissed(false);
     // Clear reply/edit state on chat switch
     setReplyingTo(null);
+  }, [chatId]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    initializeChat();
     setEditingMessageId(null);
     setEditText("");
-  }, [chatId]);
+  }, [chatId, initializeChat]);
 
   // Scroll to and highlight a target message when navigating from Saved Messages
   useEffect(() => {
@@ -581,8 +598,8 @@ export const MainChat: React.FC<MainChatProps> = ({
   const activeSearchMessageIndex =
     searchMatchIndices.length > 0
       ? searchMatchIndices[
-      Math.min(searchMatchIndex, searchMatchIndices.length - 1)
-      ]
+          Math.min(searchMatchIndex, searchMatchIndices.length - 1)
+        ]
       : -1;
   const activeSearchMessageId =
     activeSearchMessageIndex >= 0
@@ -617,10 +634,7 @@ export const MainChat: React.FC<MainChatProps> = ({
       if (moreMenuRef.current && !moreMenuRef.current.contains(target)) {
         setMoreMenuOpen(false);
       }
-      if (
-        target instanceof Element &&
-        !target.closest(".message-menu")
-      ) {
+      if (target instanceof Element && !target.closest(".message-menu")) {
         setContextMessageId(null);
       }
     };
@@ -737,7 +751,8 @@ export const MainChat: React.FC<MainChatProps> = ({
   const handleMessagesScroll = () => {
     const area = messagesAreaRef.current;
     if (!area) return;
-    const distFromBottom = area.scrollHeight - area.scrollTop - area.clientHeight;
+    const distFromBottom =
+      area.scrollHeight - area.scrollTop - area.clientHeight;
     setShowJumpToBottom(distFromBottom > 200);
   };
 
@@ -796,13 +811,19 @@ export const MainChat: React.FC<MainChatProps> = ({
   const submitTextMessage = () => {
     const text = inputText.trim();
     if (!text || isGuest || !onSendMessage) return;
-    onSendMessage({ text, kind: "text", ...(replyingTo ? { replyTo: replyingTo.id } : {}) } as any);
+    onSendMessage({
+      text,
+      kind: "text",
+      ...(replyingTo ? { replyTo: replyingTo.id } : {}),
+    } as SendMessagePayload);
     setInputText("");
     setReplyingTo(null);
     clearTypingStatus();
     // Reset textarea height
     const ta = document.querySelector<HTMLTextAreaElement>(".message-input");
-    if (ta) { ta.style.height = "auto"; }
+    if (ta) {
+      ta.style.height = "auto";
+    }
   };
 
   const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
@@ -1004,8 +1025,8 @@ export const MainChat: React.FC<MainChatProps> = ({
     if (msg.kind === "todo" && msg.todo) {
       const todoItems = Array.isArray(msg.todo.items)
         ? msg.todo.items.map((item) =>
-          typeof item === "string" ? { text: item, completedBy: [] } : item,
-        )
+            typeof item === "string" ? { text: item, completedBy: [] } : item,
+          )
         : [];
 
       const completedCount = todoItems.filter((item) =>
@@ -1058,7 +1079,10 @@ export const MainChat: React.FC<MainChatProps> = ({
                   <span
                     className={`todo-item-text ${isCompleted ? "completed" : ""}`}
                   >
-                    <HighlightText text={itemData.text} query={highlightQuery} />
+                    <HighlightText
+                      text={itemData.text}
+                      query={highlightQuery}
+                    />
                   </span>
                   {itemData.completedBy && itemData.completedBy.length > 0 && (
                     <div
@@ -1182,7 +1206,9 @@ export const MainChat: React.FC<MainChatProps> = ({
 
   return (
     <main className="main-chat">
-      <header className={`chat-header ${searchOpen ? "chat-header--search" : ""}`}>
+      <header
+        className={`chat-header ${searchOpen ? "chat-header--search" : ""}`}
+      >
         {searchOpen ? (
           <div className="chat-search-bar">
             <input
@@ -1273,9 +1299,15 @@ export const MainChat: React.FC<MainChatProps> = ({
                       <FontAwesomeIcon icon={faBellSlash} /> muted
                     </span>
                   )}
-                  {!muted && settings.typingIndicator !== false && typingUsernames && typingUsernames.length > 0 ? (
-                    <span style={{ color: "var(--primary-hover)", fontWeight: 500 }}>
-                      {typingUsernames.join(", ")} {typingUsernames.length === 1 ? "is" : "are"} typing...
+                  {!muted &&
+                  settings.typingIndicator !== false &&
+                  typingUsernames &&
+                  typingUsernames.length > 0 ? (
+                    <span
+                      style={{ color: "var(--primary-hover)", fontWeight: 500 }}
+                    >
+                      {typingUsernames.join(", ")}{" "}
+                      {typingUsernames.length === 1 ? "is" : "are"} typing...
                     </span>
                   ) : (
                     <>
@@ -1283,11 +1315,16 @@ export const MainChat: React.FC<MainChatProps> = ({
                         settings.onlineStatus !== false &&
                         activeChat.status === "online" &&
                         onlineText && (
-                          <span style={{ color: "var(--green)" }}>{onlineText}</span>
+                          <span style={{ color: "var(--green)" }}>
+                            {onlineText}
+                          </span>
                         )}
-                      {!muted && activeChat.activity && (activeChat.type !== "direct" || settings.lastSeen !== false) && (
-                        <span>{activeChat.activity}</span>
-                      )}
+                      {!muted &&
+                        activeChat.activity &&
+                        (activeChat.type !== "direct" ||
+                          settings.lastSeen !== false) && (
+                          <span>{activeChat.activity}</span>
+                        )}
                     </>
                   )}
                 </div>
@@ -1404,14 +1441,20 @@ export const MainChat: React.FC<MainChatProps> = ({
                           () => {
                             onClearChat?.(chatId);
                           },
-                          { confirmText: "Clear", danger: true, title: "Clear History" }
+                          {
+                            confirmText: "Clear",
+                            danger: true,
+                            title: "Clear History",
+                          },
                         );
                         setMoreMenuOpen(false);
                       }}
                     >
+                      <FontAwesomeIcon
+                        icon={faTrashCan}
+                      />
                       Clear history
                     </button>
-
                   </div>
                 )}
               </div>
@@ -1423,43 +1466,41 @@ export const MainChat: React.FC<MainChatProps> = ({
       {copyToast && <div className="chat-toast">Copied to clipboard</div>}
       {saveToast && <div className="chat-toast">Saved message</div>}
 
-      {!searchOpen &&
-        pinnedMessages.length > 0 &&
-        !pinnedPreviewDismissed && (
-          <button
-            type="button"
-            className="pinned-preview-bar"
-            onClick={() => {
-              setPinPanelOpen(true);
-              scrollToMessage(pinnedMessages[0].id);
+      {!searchOpen && pinnedMessages.length > 0 && !pinnedPreviewDismissed && (
+        <button
+          type="button"
+          className="pinned-preview-bar"
+          onClick={() => {
+            setPinPanelOpen(true);
+            scrollToMessage(pinnedMessages[0].id);
+          }}
+        >
+          <PinIcon />
+          <span className="pinned-preview-label">Pinned message</span>
+          <span className="pinned-preview-text">
+            {getMessagePreviewLabel(pinnedMessages[0])}
+          </span>
+          <span
+            role="button"
+            tabIndex={0}
+            className="pinned-preview-close"
+            onClick={(e) => {
+              e.stopPropagation();
+              setPinnedPreviewDismissed(true);
             }}
-          >
-            <PinIcon />
-            <span className="pinned-preview-label">Pinned message</span>
-            <span className="pinned-preview-text">
-              {getMessagePreviewLabel(pinnedMessages[0])}
-            </span>
-            <span
-              role="button"
-              tabIndex={0}
-              className="pinned-preview-close"
-              onClick={(e) => {
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
                 e.stopPropagation();
                 setPinnedPreviewDismissed(true);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setPinnedPreviewDismissed(true);
-                }
-              }}
-              aria-label="Hide pinned preview"
-            >
-              <FontAwesomeIcon icon={faXmark} />
-            </span>
-          </button>
-        )}
+              }
+            }}
+            aria-label="Hide pinned preview"
+          >
+            <FontAwesomeIcon icon={faXmark} />
+          </span>
+        </button>
+      )}
 
       {pinPanelOpen && (
         <div className="pinned-panel menu-slide-in">
@@ -1506,7 +1547,11 @@ export const MainChat: React.FC<MainChatProps> = ({
         </div>
       )}
 
-      <div className="messages-area" ref={messagesAreaRef} onScroll={handleMessagesScroll}>
+      <div
+        className="messages-area"
+        ref={messagesAreaRef}
+        onScroll={handleMessagesScroll}
+      >
         {messagesLoading ? (
           <div className="messages-loading">
             <div className="messages-loading-spinner"></div>
@@ -1615,7 +1660,7 @@ export const MainChat: React.FC<MainChatProps> = ({
                         <span className="message-time">
                           {msg.editedAt && (
                             <span className="message-edited-label">
-                              (edited) 
+                              (edited)
                             </span>
                           )}
                           {msg.timestamp}
@@ -1626,7 +1671,7 @@ export const MainChat: React.FC<MainChatProps> = ({
                                 marginLeft: "5px",
                                 color: "var(--primary)",
                                 fontSize: "11px",
-                                verticalAlign: "middle"
+                                verticalAlign: "middle",
                               }}
                             />
                           )}
@@ -1706,7 +1751,8 @@ export const MainChat: React.FC<MainChatProps> = ({
                                 type="button"
                                 className={`reaction ${reaction.userReacted ? "reaction--active" : ""}`}
                                 onClick={() =>
-                                  !isGuest && handleReact(msg.id, reaction.emoji)
+                                  !isGuest &&
+                                  handleReact(msg.id, reaction.emoji)
                                 }
                                 disabled={isGuest}
                               >
@@ -1770,11 +1816,12 @@ export const MainChat: React.FC<MainChatProps> = ({
           <div className="reply-preview-bar">
             <div className="reply-preview-content">
               <div className="reply-preview-title">
-                Replying to <span className="reply-preview-sender">{replyingTo.senderName}</span>
+                Replying to{" "}
+                <span className="reply-preview-sender">
+                  {replyingTo.senderName}
+                </span>
               </div>
-              <div className="reply-preview-text">
-                {replyingTo.text}
-              </div>
+              <div className="reply-preview-text">{replyingTo.text}</div>
             </div>
             <button
               type="button"
@@ -1959,10 +2006,16 @@ export const MainChat: React.FC<MainChatProps> = ({
 
               <div className="voice-recording-meta">
                 <span className="voice-recording-dot"></span>
-                <span className="voice-recording-timer">{formatRecordingTime(recordingTime)}</span>
+                <span className="voice-recording-timer">
+                  {formatRecordingTime(recordingTime)}
+                </span>
                 {!isLocked && (
                   <span className="voice-recording-slide-hint">
-                    <FontAwesomeIcon icon={faArrowLeft} className="slide-arrow" /> Slide left to cancel
+                    <FontAwesomeIcon
+                      icon={faArrowLeft}
+                      className="slide-arrow"
+                    />{" "}
+                    Slide left to cancel
                   </span>
                 )}
                 <div className="voice-wave-animation">
@@ -2023,7 +2076,9 @@ export const MainChat: React.FC<MainChatProps> = ({
                 <button
                   type="button"
                   className="emoji-picker-toggle-btn"
-                  onClick={() => !isGuest && setIsEmojiPickerOpen(!isEmojiPickerOpen)}
+                  onClick={() =>
+                    !isGuest && setIsEmojiPickerOpen(!isEmojiPickerOpen)
+                  }
                   disabled={isGuest}
                   title="Select emoji"
                   style={{
@@ -2033,7 +2088,7 @@ export const MainChat: React.FC<MainChatProps> = ({
                     padding: 0,
                     cursor: "pointer",
                     display: "flex",
-                    alignItems: "center"
+                    alignItems: "center",
                   }}
                 >
                   <SmileIcon />
@@ -2071,7 +2126,7 @@ export const MainChat: React.FC<MainChatProps> = ({
                       padding: 0,
                       cursor: "pointer",
                       display: "flex",
-                      alignItems: "center"
+                      alignItems: "center",
                     }}
                   >
                     <MicIcon />

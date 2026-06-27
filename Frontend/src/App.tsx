@@ -7,7 +7,6 @@ import {
   Navigate,
   useNavigate,
   useParams,
-  useLocation,
 } from "react-router-dom";
 import "./App.css";
 import { api, getSettingsFromCookies } from "./services/api";
@@ -15,6 +14,7 @@ import { SOCKET_URL } from "./config";
 import { io } from "socket.io-client";
 import { useClerk, AuthenticateWithRedirectCallback } from "@clerk/clerk-react";
 import { useSettings } from "./contexts/SettingsContext";
+import { applyAppearanceTheme, getSavedAppearanceTheme } from "./utils/theme";
 
 import { ChatSidebar } from "./components/ChatSidebar";
 import { MainChat } from "./components/MainChat";
@@ -22,6 +22,7 @@ import type { SendMessagePayload } from "./components/MainChat";
 import { Auth } from "./components/Auth";
 import Profile from "./components/Profile";
 import Saved from "./components/Saved";
+import Appearance from "./components/Appearance";
 import Settings from "./components/Settings";
 import { CallOverlay } from "./components/CallOverlay";
 import { ResizableDivider } from "./components/ResizableDivider";
@@ -106,18 +107,6 @@ const formatChatMessage = (msg: any, currentUserId: string) => ({
   }),
   isOwn: msg.sender._id === currentUserId,
   createdAt: msg.createdAt,
-  editedAt: msg.editedAt ?? null,
-  replyTo: msg.replyTo
-    ? {
-        id: typeof msg.replyTo === "object" ? msg.replyTo._id ?? msg.replyTo.id : msg.replyTo,
-        text: msg.replyTo.text ?? "",
-        senderName: msg.replyTo.sender
-          ? `${msg.replyTo.sender.firstName ?? ""} ${msg.replyTo.sender.lastName ?? ""}`
-              .trim()
-          : "Message",
-        kind: msg.replyTo.kind,
-      }
-    : null,
 });
 
 const CACHE_DEBOUNCE_MS = 400;
@@ -138,7 +127,9 @@ const getMessagePreview = (message: {
 };
 
 // Helper to synthesize a notification sound with three variants
-const playNotificationSound = (variant: "default" | "subtle" | "loud" = "default") => {
+const playNotificationSound = (
+  variant: "default" | "subtle" | "loud" = "default",
+) => {
   try {
     const audioCtx = new (
       window.AudioContext || (window as any).webkitAudioContext
@@ -248,7 +239,6 @@ const tryVibrate = (pattern: number | number[]) => {
   }
 };
 
-
 interface LayoutProps {
   currentUserData: CurrentUserData;
   activeChat: any;
@@ -261,7 +251,6 @@ interface LayoutProps {
   onToggleTodo?: (messageId: string, itemIndex: number) => void;
   onClearChat?: (chatId: string) => void;
   onDeleteMessage?: (messageId: string) => Promise<void>;
-  onEditMessage?: (messageId: string, newText: string) => Promise<void>;
   onReactToMessage?: (messageId: string, emoji: string) => Promise<void>;
   onStartCall?: (type: "audio" | "video") => void;
   isCallActive?: boolean;
@@ -313,6 +302,7 @@ function GroupInviteRoute({
 interface MainLayoutProps extends LayoutProps {
   sidebarWidth: number;
   onSidebarResize: (width: number) => void;
+  isFullScreen?: boolean;
 }
 
 function MainLayout({
@@ -327,7 +317,6 @@ function MainLayout({
   onToggleTodo,
   onClearChat,
   onDeleteMessage,
-  onEditMessage,
   onReactToMessage,
   onStartCall,
   isCallActive,
@@ -338,11 +327,8 @@ function MainLayout({
   onStopTyping,
   targetMessageId,
   onClearTargetMessageId,
+  isFullScreen = false,
 }: MainLayoutProps) {
-  const location = useLocation();
-  const isSubPage = ["/settings", "/saved", "/profile"].includes(location.pathname);
-  const subPageClass = isSubPage ? "subpage-active" : "";
-
   const defaultActiveChat = activeChat || {
     id: "",
     name: "Select a chat",
@@ -353,8 +339,13 @@ function MainLayout({
 
   const isChatActive = activeChat && activeChat.id ? "chat-active" : "";
 
+  // In full-screen mode, render only children without sidebar, divider, and MainChat
+  if (isFullScreen) {
+    return <>{children}</>;
+  }
+
   return (
-    <div className={`app-container ${isChatActive} ${subPageClass}`}>
+    <div className={`app-container ${isChatActive}`}>
       <div
         style={{ width: `${sidebarWidth}px` }}
         className="chat-sidebar-wrapper"
@@ -382,7 +373,6 @@ function MainLayout({
         onToggleTodo={onToggleTodo}
         onClearChat={onClearChat}
         onDeleteMessage={onDeleteMessage}
-        onEditMessage={onEditMessage}
         onReactToMessage={onReactToMessage}
         onStartCall={onStartCall}
         isCallActive={isCallActive}
@@ -469,7 +459,9 @@ function App() {
   const [chatsLoading, setChatsLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
   const [sidebarWidth, setSidebarWidth] = useState(320);
-  const [typingUsers, setTypingUsers] = useState<Record<string, Record<string, string>>>({});
+  const [typingUsers, setTypingUsers] = useState<
+    Record<string, Record<string, string>>
+  >({});
   const [targetMessageId, setTargetMessageId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -478,6 +470,20 @@ function App() {
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    applyAppearanceTheme();
+
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleSystemThemeChange = () => {
+      if (getSavedAppearanceTheme() === "system") {
+        applyAppearanceTheme("system");
+      }
+    };
+
+    media.addEventListener("change", handleSystemThemeChange);
+    return () => media.removeEventListener("change", handleSystemThemeChange);
   }, []);
 
   // Load and apply user settings on authentication / start
@@ -489,18 +495,19 @@ function App() {
     // Apply settings from cookies immediately for instant UI application
     const cookieSettings = getSettingsFromCookies();
     if (cookieSettings) {
-      if (cookieSettings.theme) {
-        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        const shouldUseDark = cookieSettings.theme === "dark" || (cookieSettings.theme === "auto" && prefersDark);
-        document.body.classList.toggle("light-theme", !shouldUseDark);
-        localStorage.setItem("theme", shouldUseDark ? "dark" : "light");
-      }
+      applyAppearanceTheme(cookieSettings.appearanceTheme);
       if (cookieSettings.fontSize) {
-        document.body.className = document.body.className.replace(/font-\w+/g, "");
+        document.body.className = document.body.className.replace(
+          /font-\w+/g,
+          "",
+        );
         document.body.classList.add(`font-${cookieSettings.fontSize}`);
       }
       if (cookieSettings.compactMode !== undefined) {
-        document.body.classList.toggle("compact-mode", cookieSettings.compactMode);
+        document.body.classList.toggle(
+          "compact-mode",
+          cookieSettings.compactMode,
+        );
       }
     }
 
@@ -512,17 +519,14 @@ function App() {
         // Sync to context
         updateLocalSettings(fetched);
 
-        // Apply theme
-        if (fetched.theme) {
-          const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-          const shouldUseDark = fetched.theme === "dark" || (fetched.theme === "auto" && prefersDark);
-          document.body.classList.toggle("light-theme", !shouldUseDark);
-          localStorage.setItem("theme", shouldUseDark ? "dark" : "light");
-        }
+        applyAppearanceTheme(fetched.appearanceTheme);
 
         // Apply font size
         if (fetched.fontSize) {
-          document.body.className = document.body.className.replace(/font-\w+/g, "");
+          document.body.className = document.body.className.replace(
+            /font-\w+/g,
+            "",
+          );
           document.body.classList.add(`font-${fetched.fontSize}`);
         }
 
@@ -643,24 +647,46 @@ function App() {
       console.log("Disconnected from Socket.IO server");
     });
 
-    socket.on("user_typing", (payload: { chatId: string; userId: string; username: string }) => {
-      if (settingsRef.current.typingIndicator === false) return;
-      setTypingUsers((prev) => {
-        const chatMap = prev[payload.chatId] || {};
-        return {
-          ...prev,
-          [payload.chatId]: {
-            ...chatMap,
-            [payload.userId]: payload.username,
-          },
-        };
-      });
+    socket.on(
+      "user_typing",
+      (payload: { chatId: string; userId: string; username: string }) => {
+        if (settingsRef.current.typingIndicator === false) return;
+        setTypingUsers((prev) => {
+          const chatMap = prev[payload.chatId] || {};
+          return {
+            ...prev,
+            [payload.chatId]: {
+              ...chatMap,
+              [payload.userId]: payload.username,
+            },
+          };
+        });
 
-      const timeoutKey = `${payload.chatId}-${payload.userId}`;
-      const existing = typingTimeouts.get(timeoutKey);
-      if (existing) clearTimeout(existing);
+        const timeoutKey = `${payload.chatId}-${payload.userId}`;
+        const existing = typingTimeouts.get(timeoutKey);
+        if (existing) clearTimeout(existing);
 
-      const timeout = setTimeout(() => {
+        const timeout = setTimeout(() => {
+          setTypingUsers((prev) => {
+            const chatMap = prev[payload.chatId] || {};
+            if (!chatMap[payload.userId]) return prev;
+            const newMap = { ...chatMap };
+            delete newMap[payload.userId];
+            return {
+              ...prev,
+              [payload.chatId]: newMap,
+            };
+          });
+          typingTimeouts.delete(timeoutKey);
+        }, 5000);
+
+        typingTimeouts.set(timeoutKey, timeout);
+      },
+    );
+
+    socket.on(
+      "user_stop_typing",
+      (payload: { chatId: string; userId: string }) => {
         setTypingUsers((prev) => {
           const chatMap = prev[payload.chatId] || {};
           if (!chatMap[payload.userId]) return prev;
@@ -671,31 +697,15 @@ function App() {
             [payload.chatId]: newMap,
           };
         });
-        typingTimeouts.delete(timeoutKey);
-      }, 5000);
 
-      typingTimeouts.set(timeoutKey, timeout);
-    });
-
-    socket.on("user_stop_typing", (payload: { chatId: string; userId: string }) => {
-      setTypingUsers((prev) => {
-        const chatMap = prev[payload.chatId] || {};
-        if (!chatMap[payload.userId]) return prev;
-        const newMap = { ...chatMap };
-        delete newMap[payload.userId];
-        return {
-          ...prev,
-          [payload.chatId]: newMap,
-        };
-      });
-
-      const timeoutKey = `${payload.chatId}-${payload.userId}`;
-      const existing = typingTimeouts.get(timeoutKey);
-      if (existing) {
-        clearTimeout(existing);
-        typingTimeouts.delete(timeoutKey);
-      }
-    });
+        const timeoutKey = `${payload.chatId}-${payload.userId}`;
+        const existing = typingTimeouts.get(timeoutKey);
+        if (existing) {
+          clearTimeout(existing);
+          typingTimeouts.delete(timeoutKey);
+        }
+      },
+    );
 
     socket.on("user_status_changed", (payload: any) => {
       const activity =
@@ -845,7 +855,8 @@ function App() {
         const isGroupOrChannel = chatType === "group" || chatType === "channel";
 
         // Check if the message is a @mention of the current user
-        const currentUserName = currentUserData.name?.split(" ")[0]?.toLowerCase() ?? "";
+        const currentUserName =
+          currentUserData.name?.split(" ")[0]?.toLowerCase() ?? "";
         const isMention =
           currentUserName &&
           typeof msg.text === "string" &&
@@ -863,14 +874,18 @@ function App() {
         }
 
         // --- Vibration ---
-        if (s.notificationVibration !== false && (!isGroupOrChannel || s.groupNotifications !== false)) {
+        if (
+          s.notificationVibration !== false &&
+          (!isGroupOrChannel || s.groupNotifications !== false)
+        ) {
           tryVibrate([100, 50, 100]);
         }
 
         // --- Desktop notification ---
         if (s.notifications !== false) {
           // Skip group notifications if user turned them off
-          const shouldNotify = !isGroupOrChannel || s.groupNotifications !== false;
+          const shouldNotify =
+            !isGroupOrChannel || s.groupNotifications !== false;
           if (shouldNotify) {
             const isWindowHidden = document.hidden || !document.hasFocus();
             if (!isCurrentChat || isWindowHidden) {
@@ -886,6 +901,61 @@ function App() {
           }
         }
       }
+    });
+
+    // Listen for new conversation (DM) creation — so the recipient sees it
+    // in their sidebar immediately without needing to refresh the page
+    socket.on("new_conversation", (conv: any) => {
+      if (!conv?._id) return;
+      const convId = String(conv._id);
+
+      // Auto-join the socket room so future messages in this chat arrive in real-time
+      socket.emit("join_chat", convId);
+
+      setChats((prev) => {
+        // Don't add if it already exists
+        if (prev.some((c) => c.id === convId)) return prev;
+
+        const other = conv.participants?.find(
+          (p: any) => String(p._id) !== currentUserData.id,
+        );
+
+        const lastMsg =
+          typeof conv.lastMessage === "string"
+            ? conv.lastMessage
+            : conv.lastMessage?.text || "No messages yet";
+
+        const newChat = {
+          id: convId,
+          userId: other?._id || "",
+          name: other
+            ? `${other.firstName} ${other.lastName || ""}`.trim()
+            : "Unknown",
+          avatar: other?.firstName?.[0] || "U",
+          avatarUrl:
+            typeof other?.avatar === "string"
+              ? other.avatar
+              : other?.avatar?.url || null,
+          avatarColor: "#4f46e5",
+          lastMessage: lastMsg,
+          timestamp: conv.lastMessageAt
+            ? new Date(conv.lastMessageAt).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "",
+          type: "direct" as const,
+          status: other?.status || "offline",
+          lastSeen: other?.lastSeen,
+          activity:
+            other?.status === "online"
+              ? undefined
+              : formatLastSeen(other?.lastSeen),
+          unreadCount: 1,
+        };
+
+        return [newChat, ...prev];
+      });
     });
 
     // Listen for poll updates
@@ -924,23 +994,6 @@ function App() {
             : m,
         ),
       );
-    });
-
-    // Listen for message edits
-    socket.on("message_edited", (payload: any) => {
-      const editedChatId = String(payload.chatId ?? "");
-      if (
-        activeChatRef.current &&
-        editedChatId === String(activeChatRef.current.id)
-      ) {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === payload.messageId
-              ? { ...m, text: payload.text, editedAt: payload.editedAt }
-              : m,
-          ),
-        );
-      }
     });
 
     socket.on("todo_updated", (payload: any) => {
@@ -1306,26 +1359,6 @@ function App() {
     }
   }, [socketInstance, activeChat?.id]);
 
-  const handleEditMessage = useCallback(
-    async (messageId: string, newText: string) => {
-      if (!newText.trim()) return;
-      // Optimistic update
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId
-            ? { ...m, text: newText.trim(), editedAt: new Date().toISOString() }
-            : m,
-        ),
-      );
-      try {
-        await api.chats.editMessage(messageId, newText.trim());
-      } catch (err) {
-        console.error("Failed to edit message:", err);
-      }
-    },
-    [],
-  );
-
   const handleSendMessage = (payload: SendMessagePayload) => {
     if (!activeChat || !currentUserData) return;
 
@@ -1372,7 +1405,6 @@ function App() {
           chatId: activeChat.id,
           text,
           kind,
-          replyTo: (payload as any).replyTo,
           attachment: payload.attachment,
           poll: payload.poll,
           todo: payload.todo,
@@ -1663,7 +1695,6 @@ function App() {
                   onToggleTodo={handleToggleTodo}
                   onClearChat={handleClearChat}
                   onDeleteMessage={handleDeleteMessage}
-                  onEditMessage={handleEditMessage}
                   onReactToMessage={handleReactToMessage}
                   onStartCall={handleStartCall}
                   isCallActive={isInCall}
@@ -1717,7 +1748,6 @@ function App() {
                   onToggleTodo={handleToggleTodo}
                   onClearChat={handleClearChat}
                   onDeleteMessage={handleDeleteMessage}
-                  onEditMessage={handleEditMessage}
                   onReactToMessage={handleReactToMessage}
                   onStartCall={handleStartCall}
                   isCallActive={isInCall}
@@ -1726,6 +1756,7 @@ function App() {
                   typingUsernames={typingUsernames}
                   onTyping={handleTyping}
                   onStopTyping={handleStopTyping}
+                  isFullScreen={isMobile}
                 >
                   <div className="profile-container">
                     <Profile />
@@ -1752,7 +1783,6 @@ function App() {
                   onToggleTodo={handleToggleTodo}
                   onClearChat={handleClearChat}
                   onDeleteMessage={handleDeleteMessage}
-                  onEditMessage={handleEditMessage}
                   onReactToMessage={handleReactToMessage}
                   onStartCall={handleStartCall}
                   isCallActive={isInCall}
@@ -1763,8 +1793,41 @@ function App() {
                   onStopTyping={handleStopTyping}
                   targetMessageId={targetMessageId}
                   onClearTargetMessageId={() => setTargetMessageId(null)}
+                  isFullScreen={isMobile}
                 >
                   <Saved onGoToMessage={handleGoToMessage} />
+                </MainLayout>
+              ) : (
+                <Navigate to="/auth" replace />
+              )
+            }
+          />
+
+          <Route
+            path="/appearance"
+            element={
+              currentUserData ? (
+                <MainLayout
+                  currentUserData={currentUserData}
+                  activeChat={activeChat}
+                  messages={messages}
+                  users={usersMap}
+                  onSendMessage={handleSendMessage}
+                  onBack={() => setActiveChat(null)}
+                  onToggleTodo={handleToggleTodo}
+                  onClearChat={handleClearChat}
+                  onDeleteMessage={handleDeleteMessage}
+                  onReactToMessage={handleReactToMessage}
+                  onStartCall={handleStartCall}
+                  isCallActive={isInCall}
+                  sidebarWidth={sidebarWidth}
+                  onSidebarResize={setSidebarWidth}
+                  typingUsernames={typingUsernames}
+                  onTyping={handleTyping}
+                  onStopTyping={handleStopTyping}
+                  isFullScreen={isMobile}
+                >
+                  <Appearance />
                 </MainLayout>
               ) : (
                 <Navigate to="/auth" replace />
@@ -1786,7 +1849,6 @@ function App() {
                   onToggleTodo={handleToggleTodo}
                   onClearChat={handleClearChat}
                   onDeleteMessage={handleDeleteMessage}
-                  onEditMessage={handleEditMessage}
                   onReactToMessage={handleReactToMessage}
                   onStartCall={handleStartCall}
                   isCallActive={isInCall}
@@ -1795,6 +1857,7 @@ function App() {
                   typingUsernames={typingUsernames}
                   onTyping={handleTyping}
                   onStopTyping={handleStopTyping}
+                  isFullScreen={isMobile}
                 >
                   <Settings />
                 </MainLayout>
