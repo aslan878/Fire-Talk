@@ -2,9 +2,11 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
+import path from "path";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import apiRouter from "./routes/index";
+import uploadRouter from "./routes/upload";
 import User from "./models/user";
 
 dotenv.config();
@@ -17,8 +19,23 @@ const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
   .filter((origin) => origin && origin !== "none");
 
 app.use(cors({ origin: allowedOrigins }));
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+app.use(express.json({ limit: "1gb" }));
+
+app.use(express.urlencoded({ limit: "1gb", extended: true }));
+
+app.use("/uploads", (req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "*");
+  if (req.method === "OPTIONS") {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
+app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
+
+app.use("/api/upload", uploadRouter);
 
 // Health check endpoint for monitoring services
 app.get("/api/health", (req, res) => {

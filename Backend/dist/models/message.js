@@ -104,7 +104,6 @@ const messageSchema = new mongoose_1.default.Schema({
     editedAt: { type: Date, default: null },
     deletedAt: { type: Date, default: null },
 }, { timestamps: true });
-messageSchema.index({ chatType: 1, chatId: 1, deletedAt: 1, createdAt: -1 });
-messageSchema.index({ sender: 1, createdAt: -1 });
+messageSchema.index({ chatType: 1, chatId: 1, createdAt: -1 });
 exports.default = mongoose_1.default.model("Message", messageSchema);
 //# sourceMappingURL=message.js.map

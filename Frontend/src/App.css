@@ -1118,7 +1118,7 @@
 }
 
 .ItemStyle:hover {
-  background: var(--popup-item-hover-bg);
+  background: var(--primary);
   color: var(--popup-item-hover-color);
 }
 
@@ -2711,7 +2711,7 @@ body.light-theme .search-highlight {
 }
 .jump-to-bottom-btn {
   position: absolute;
-  bottom: 72px;
+  bottom: 94px;
   right: 20px;
   width: 40px;
   height: 40px;

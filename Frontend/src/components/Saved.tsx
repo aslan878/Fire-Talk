@@ -14,6 +14,7 @@ import {
 import "./Saved.css";
 import { api, type SavedMessage } from "../services/api";
 import { VoicePlayer } from "./VoicePlayer";
+import { ChatMediaViewer, type MediaSlide } from "./ChatMediaViewer";
 
 interface SavedProps {
   /** Called when the user wants to jump to a saved message in its original chat. */
@@ -47,69 +48,112 @@ const getKindIcon = (kind: string) => {
   return faBookmark;
 };
 
-const renderMediaPreview = (item: SavedMessage) => {
-  const msg = item.message;
 
-  if (msg.kind === "voice" && msg.attachment?.url) {
-    return (
-      <div
-        className="saved-media-preview"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <VoicePlayer
-          url={msg.attachment.url}
-          durationSec={msg.attachment.durationSec}
-          isOwn={false}
-        />
-      </div>
-    );
-  }
-
-  if (msg.kind === "image" && msg.attachment?.url) {
-    return (
-      <div className="saved-media-preview">
-        <img
-          src={msg.attachment.url}
-          alt={msg.attachment.fileName || "Image"}
-        />
-      </div>
-    );
-  }
-
-  if (msg.kind === "video" && msg.attachment?.url) {
-    return (
-      <div className="saved-media-preview">
-        <video
-          src={msg.attachment.url}
-          controls
-          onClick={(e) => e.stopPropagation()}
-        />
-      </div>
-    );
-  }
-
-  if (msg.kind === "file" && msg.attachment) {
-    return (
-      <a
-        className="saved-file-link"
-        href={msg.attachment.url || undefined}
-        download={msg.attachment.fileName || undefined}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <FontAwesomeIcon icon={faFileArrowDown} />
-        {msg.attachment.fileName || msg.text || "Download file"}
-      </a>
-    );
-  }
-
-  return null;
-};
 
 const Saved = ({ onGoToMessage }: SavedProps) => {
   const navigate = useNavigate();
   const [savedItems, setSavedItems] = useState<SavedMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Media viewer
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const mediaSlides: MediaSlide[] = savedItems
+    .filter(
+      (item) =>
+        (item.message.kind === "image" || item.message.kind === "video") &&
+        item.message.attachment?.url,
+    )
+    .map((item) => ({
+      src: item.message.attachment!.url!,
+      type: item.message.kind === "image" ? "image" : "video",
+      mimeType: item.message.attachment?.mimeType,
+      fileName: item.message.attachment?.fileName,
+    }));
+
+  const renderMediaPreview = (
+    item: SavedMessage,
+    onOpenMedia?: (index: number) => void,
+  ) => {
+    const msg = item.message;
+
+    if (msg.kind === "voice" && msg.attachment?.url) {
+      return (
+        <div
+          className="saved-media-preview"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <VoicePlayer
+            url={msg.attachment.url}
+            durationSec={msg.attachment.durationSec}
+            isOwn={false}
+          />
+        </div>
+      );
+    }
+
+    if (msg.kind === "image" && msg.attachment?.url) {
+      return (
+        <div
+          className="saved-media-preview"
+          style={{ cursor: "pointer" }}
+          onClick={(e) => {
+            e.stopPropagation();
+            const idx = mediaSlides.findIndex(
+              (s) => s.src === msg.attachment!.url,
+            );
+            if (idx >= 0) onOpenMedia?.(idx);
+          }}
+        >
+          <img
+            src={msg.attachment.url}
+            alt={msg.attachment.fileName || "Image"}
+          />
+        </div>
+      );
+    }
+
+    if (msg.kind === "video" && msg.attachment?.url) {
+      return (
+        <div
+          className="saved-media-preview"
+          style={{ cursor: "pointer" }}
+          onClick={(e) => {
+            e.stopPropagation();
+            const idx = mediaSlides.findIndex(
+              (s) => s.src === msg.attachment!.url,
+            );
+            if (idx >= 0) onOpenMedia?.(idx);
+          }}
+        >
+          <video
+            controls
+            onClick={(e) => e.stopPropagation()}
+            onError={(e) => console.error("Video load error:", (e.target as HTMLVideoElement).error)}
+          >
+            <source src={msg.attachment.url} type={msg.attachment.mimeType || "video/mp4"} />
+          </video>
+        </div>
+      );
+    }
+
+    if (msg.kind === "file" && msg.attachment) {
+      return (
+        <a
+          className="saved-file-link"
+          href={msg.attachment.url || undefined}
+          download={msg.attachment.fileName || undefined}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <FontAwesomeIcon icon={faFileArrowDown} />
+          {msg.attachment.fileName || msg.text || "Download file"}
+        </a>
+      );
+    }
+
+    return null;
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -203,7 +247,12 @@ const Saved = ({ onGoToMessage }: SavedProps) => {
                 </div>
                 <p>{getMessageText(item)}</p>
 
-                {renderMediaPreview(item)}
+                {renderMediaPreview(item, (idx) => {
+                  if (idx >= 0) {
+                    setLightboxIndex(idx);
+                    setLightboxOpen(true);
+                  }
+                })}
 
                 <span className="saved-goto-badge">
                   <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
@@ -222,6 +271,13 @@ const Saved = ({ onGoToMessage }: SavedProps) => {
           ))
         )}
       </div>
+      <ChatMediaViewer
+        open={lightboxOpen}
+        index={lightboxIndex}
+        slides={mediaSlides}
+        onClose={() => setLightboxOpen(false)}
+        onIndexChange={setLightboxIndex}
+      />
     </div>
   );
 };

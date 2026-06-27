@@ -655,4 +655,18 @@ export const api = {
       });
     },
   },
+
+  uploadFile: async (file: File): Promise<{
+    url: string;
+    fileName: string;
+    mimeType: string;
+    size: number;
+  }> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request("/upload", {
+      method: "POST",
+      body: formData,
+    });
+  },
 };

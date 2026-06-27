@@ -19,19 +19,18 @@
   --radius-md: 10px;
   --radius-lg: 14px;
 
-
   --icon-color: var(--text-muted);
   --icon-hover-color: var(--text-main);
   --menu-icon-color: var(--primary);
   --menu-icon-hover-color: #ffffff;
 
-  --popup-bg: rgba(24, 27, 33, 0.179);
+  --popup-bg: rgba(24, 27, 33, 0.591);
   --popup-border: rgba(255, 255, 255, 0.08);
   --popup-shadow: 0 14px 34px rgba(0, 0, 0, 0.38);
   --popup-blur: 10px;
 
   --popup-item-color: var(--text-muted);
-  --popup-item-hover-bg: rgba(255, 255, 255, 0.188);
+  --popup-item-hover-bg: rgb(115, 115, 115);
   --popup-item-hover-color: #ffffff;
 }
 
@@ -59,7 +58,7 @@ body.light-theme {
   --popup-blur: 5px;
 
   --popup-item-color: var(--text-muted);
-  --popup-item-hover-bg: var(--prrimary);
+  --popup-item-hover-bg: var(--primary);
   --popup-item-hover-color: #ffffff;
 }
 
@@ -257,38 +256,82 @@ body.font-large {
 }
 
 /* Specific elements scaling */
-body.font-small .message-bubble { font-size: 13px; }
-body.font-large .message-bubble { font-size: 17px; }
+body.font-small .message-bubble {
+  font-size: 13px;
+}
+body.font-large .message-bubble {
+  font-size: 17px;
+}
 
-body.font-small .message-sender { font-size: 12px; }
-body.font-large .message-sender { font-size: 16px; }
+body.font-small .message-sender {
+  font-size: 12px;
+}
+body.font-large .message-sender {
+  font-size: 16px;
+}
 
-body.font-small .message-time { font-size: 10px; }
-body.font-large .message-time { font-size: 14px; }
+body.font-small .message-time {
+  font-size: 10px;
+}
+body.font-large .message-time {
+  font-size: 14px;
+}
 
-body.font-small .chat-item-name { font-size: 13px; }
-body.font-large .chat-item-name { font-size: 17px; }
+body.font-small .chat-item-name {
+  font-size: 13px;
+}
+body.font-large .chat-item-name {
+  font-size: 17px;
+}
 
-body.font-small .chat-item-last-message { font-size: 11px; }
-body.font-large .chat-item-last-message { font-size: 15px; }
+body.font-small .chat-item-last-message {
+  font-size: 11px;
+}
+body.font-large .chat-item-last-message {
+  font-size: 15px;
+}
 
-body.font-small .chat-item-time { font-size: 10px; }
-body.font-large .chat-item-time { font-size: 14px; }
+body.font-small .chat-item-time {
+  font-size: 10px;
+}
+body.font-large .chat-item-time {
+  font-size: 14px;
+}
 
-body.font-small .message-input { font-size: 13px; }
-body.font-large .message-input { font-size: 17px; }
+body.font-small .message-input {
+  font-size: 13px;
+}
+body.font-large .message-input {
+  font-size: 17px;
+}
 
-body.font-small .chat-header-info h2 { font-size: 14px; }
-body.font-large .chat-header-info h2 { font-size: 18px; }
+body.font-small .chat-header-info h2 {
+  font-size: 14px;
+}
+body.font-large .chat-header-info h2 {
+  font-size: 18px;
+}
 
-body.font-small .chat-header-status { font-size: 10px; }
-body.font-large .chat-header-status { font-size: 14px; }
+body.font-small .chat-header-status {
+  font-size: 10px;
+}
+body.font-large .chat-header-status {
+  font-size: 14px;
+}
 
-body.font-small .search-input { font-size: 13px; }
-body.font-large .search-input { font-size: 17px; }
+body.font-small .search-input {
+  font-size: 13px;
+}
+body.font-large .search-input {
+  font-size: 17px;
+}
 
-body.font-small .tab { font-size: 10px; }
-body.font-large .tab { font-size: 14px; }
+body.font-small .tab {
+  font-size: 10px;
+}
+body.font-large .tab {
+  font-size: 14px;
+}
 
 body.font-small .settings-row,
 body.font-small .settings-toggle-row {
@@ -299,5 +342,9 @@ body.font-large .settings-toggle-row {
   font-size: 16px;
 }
 
-body.font-small .settings-row select { font-size: 11px; }
-body.font-large .settings-row select { font-size: 15px; }
+body.font-small .settings-row select {
+  font-size: 11px;
+}
+body.font-large .settings-row select {
+  font-size: 15px;
+}

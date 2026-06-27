@@ -5,10 +5,11 @@ import type {
   MessageAttachment,
   MessageKind,
 } from "../data/types";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { api } from "../services/api";
 import { EmojiPicker } from "./EmojiPicker";
 import { VoicePlayer } from "./VoicePlayer";
+import { ChatMediaViewer, type MediaSlide } from "./ChatMediaViewer";
 import {
   SearchIcon,
   PinIcon,
@@ -227,6 +228,25 @@ export const MainChat: React.FC<MainChatProps> = ({
 
   // Jump-to-bottom
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
+
+  // Media viewer (lightbox)
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const mediaSlides = useMemo<MediaSlide[]>(
+    () =>
+      messages
+        .filter(
+          (m) =>
+            (m.kind === "image" || m.kind === "video") && m.attachment?.url,
+        )
+        .map((m) => ({
+          src: m.attachment!.url!,
+          type: m.kind === "image" ? "image" : "video",
+          mimeType: m.attachment?.mimeType,
+          fileName: m.attachment?.fileName,
+        })),
+    [messages],
+  );
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -826,42 +846,57 @@ export const MainChat: React.FC<MainChatProps> = ({
     }
   };
 
-  const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
+  const MAX_ATTACHMENT_BYTES = 1024 * 1024 * 1024;
 
-  const handleFilePick = (
+  const handleFilePick = async (
     file: File | undefined,
     forcedKind?: "image" | "video" | "file",
   ) => {
     if (!file || isGuest || !onSendMessage) return;
 
     if (file.size > MAX_ATTACHMENT_BYTES) {
-      showAlert("File is too large. Maximum size is 4 MB.");
+      showAlert("File is too large. Maximum size is 1 GB.");
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const kind =
-        forcedKind ||
-        (file.type.startsWith("image/")
-          ? "image"
-          : file.type.startsWith("video/")
-            ? "video"
-            : "file");
+    const kind =
+      forcedKind ||
+      (file.type.startsWith("image/")
+        ? "image"
+        : file.type.startsWith("video/")
+          ? "video"
+          : "file");
 
-      onSendMessage({
-        kind,
-        text: kind === "file" ? file.name : "",
-        attachment: {
-          url: typeof reader.result === "string" ? reader.result : null,
-          mimeType: file.type || "application/octet-stream",
-          fileName: file.name,
-          size: file.size,
-        },
+    let url: string;
+    if (kind === "image") {
+      url = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () =>
+          resolve(typeof reader.result === "string" ? reader.result : "");
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
       });
-      setIsClipOpen(false);
-    };
-    reader.readAsDataURL(file);
+    } else {
+      try {
+        const uploaded = await api.uploadFile(file);
+        url = uploaded.url;
+      } catch {
+        showAlert("Failed to upload file. Please try again.");
+        return;
+      }
+    }
+
+    onSendMessage({
+      kind,
+      text: kind === "file" ? file.name : "",
+      attachment: {
+        url: url || null,
+        mimeType: file.type || "application/octet-stream",
+        fileName: file.name,
+        size: file.size,
+      },
+    });
+    setIsClipOpen(false);
   };
 
   const openComposer = (mode: "poll" | "todo") => {
@@ -937,15 +972,31 @@ export const MainChat: React.FC<MainChatProps> = ({
     }
 
     if ((msg.kind === "image" || msg.kind === "video") && msg.attachment?.url) {
+      const mediaIdx = mediaSlides.findIndex(
+        (s) => s.src === msg.attachment!.url,
+      );
+      const openViewer = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (mediaIdx >= 0) {
+          setLightboxIndex(mediaIdx);
+          setLightboxOpen(true);
+        }
+      };
       return (
-        <div className="message-attachment">
+        <div
+          className="message-attachment"
+          style={{ cursor: "pointer" }}
+          onClick={openViewer}
+        >
           {msg.kind === "image" ? (
             <img
               src={msg.attachment.url}
               alt={msg.attachment.fileName || "Attachment"}
             />
           ) : (
-            <video src={msg.attachment.url} controls />
+            <video controls onError={(e) => console.error("Video load error:", (e.target as HTMLVideoElement).error)}>
+              <source src={msg.attachment.url} type={msg.attachment.mimeType || "video/mp4"} />
+            </video>
           )}
           {msg.text && (
             <p>
@@ -2137,6 +2188,13 @@ export const MainChat: React.FC<MainChatProps> = ({
           )}
         </div>
       </div>
+      <ChatMediaViewer
+        open={lightboxOpen}
+        index={lightboxIndex}
+        slides={mediaSlides}
+        onClose={() => setLightboxOpen(false)}
+        onIndexChange={setLightboxIndex}
+      />
     </main>
   );
 };

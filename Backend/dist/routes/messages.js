@@ -201,6 +201,26 @@ router.post("/", requireUser_1.requireUser, async (req, res) => {
                 const io = req.app.get("io");
                 if (io) {
                     io.to(chatId).emit("new_message", populated ?? responseBody);
+                    // For DMs: notify each participant via their personal room
+                    // so they see the conversation in their sidebar even if they
+                    // haven't joined the chat's socket room yet (first message scenario).
+                    if (chatType === "direct") {
+                        try {
+                            const conv = await conversation_1.default.findById(oid)
+                                .populate("participants", "firstName lastName username avatar status lastSeen")
+                                .populate("lastMessage", "text kind createdAt sender")
+                                .lean();
+                            if (conv && conv.participants) {
+                                for (const participant of conv.participants) {
+                                    const pid = String(participant._id);
+                                    io.to(pid).emit("new_conversation", conv);
+                                }
+                            }
+                        }
+                        catch (convErr) {
+                            console.error("Failed to emit new_conversation:", convErr);
+                        }
+                    }
                 }
             }
             catch (err) {

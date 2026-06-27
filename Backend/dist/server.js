@@ -8,9 +8,11 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const mongoose_1 = __importDefault(require("mongoose"));
+const path_1 = __importDefault(require("path"));
 const http_1 = require("http");
 const socket_io_1 = require("socket.io");
 const index_1 = __importDefault(require("./routes/index"));
+const upload_1 = __importDefault(require("./routes/upload"));
 const user_1 = __importDefault(require("./models/user"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -20,8 +22,10 @@ const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
     .map((origin) => origin.trim())
     .filter((origin) => origin && origin !== "none");
 app.use((0, cors_1.default)({ origin: allowedOrigins }));
-app.use(express_1.default.json({ limit: "50mb" }));
-app.use(express_1.default.urlencoded({ limit: "50mb", extended: true }));
+app.use(express_1.default.json({ limit: "1gb" }));
+app.use(express_1.default.urlencoded({ limit: "1gb", extended: true }));
+app.use("/uploads", express_1.default.static(path_1.default.resolve(__dirname, "../uploads")));
+app.use("/api/upload", upload_1.default);
 // Health check endpoint for monitoring services
 app.get("/api/health", (req, res) => {
     const healthCheck = {
@@ -59,13 +63,8 @@ function endCallForUser(userId, callId) {
 function relayToUser(targetUserId, event, payload, fromUserId) {
     io.to(targetUserId).emit(event, { ...payload, fromUserId });
 }
-const logSocket = (...args) => {
-    if (process.env.NODE_ENV !== "production") {
-        console.log(...args);
-    }
-};
 io.on("connection", (socket) => {
-    logSocket(`User connected: ${socket.id}`);
+    console.log(`User connected: ${socket.id}`);
     const userId = socket.handshake.auth.userId;
     if (userId) {
         socket.join(userId);
@@ -77,11 +76,11 @@ io.on("connection", (socket) => {
             status: "online",
             lastSeen: new Date().toISOString(),
         });
-        logSocket(`User ${userId} joined personal room`);
+        console.log(`User ${userId} joined personal room`);
     }
     socket.on("join_chat", (chatId) => {
         socket.join(chatId);
-        logSocket(`Socket ${socket.id} joined chat ${chatId}`);
+        console.log(`Socket ${socket.id} joined chat ${chatId}`);
     });
     socket.on("typing", (payload) => {
         if (userId) {
@@ -119,12 +118,12 @@ io.on("connection", (socket) => {
     socket.on("join_qr_room", (qrToken) => {
         if (qrToken && typeof qrToken === "string") {
             socket.join(`qr_auth_${qrToken}`);
-            logSocket(`Socket ${socket.id} joined QR auth room: qr_auth_${qrToken}`);
+            console.log(`Socket ${socket.id} joined QR auth room: qr_auth_${qrToken}`);
         }
     });
     socket.on("leave_chat", (chatId) => {
         socket.leave(chatId);
-        logSocket(`Socket ${socket.id} left chat ${chatId}`);
+        console.log(`Socket ${socket.id} left chat ${chatId}`);
     });
     socket.on("call:invite", (payload) => {
         if (!userId || !payload?.toUserId || !payload?.callId)
@@ -196,7 +195,7 @@ io.on("connection", (socket) => {
                 userSocketCounts.set(userId, activeSockets);
             }
         }
-        logSocket(`User disconnected: ${socket.id}`);
+        console.log(`User disconnected: ${socket.id}`);
     });
 });
 const uri = process.env.MONGODB_URL;
