@@ -1,0 +1,159 @@
+.yarl__root {
+  --yarl__color_backdrop: rgba(12, 14, 18, 0.96);
+  --viewer-control-bg: rgba(24, 27, 33, 0.78);
+  --viewer-control-border: rgba(255, 255, 255, 0.14);
+  --viewer-control-hover: rgba(255, 255, 255, 0.14);
+}
+
+/* ===== Navigation arrows ===== */
+button.yarl__navigation_prev,
+button.yarl__navigation_next {
+  background: var(--viewer-control-bg);
+  border: 1px solid var(--viewer-control-border);
+  color: #fff;
+  cursor: pointer;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  border-radius: 50%;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  transition: background 0.2s ease, transform 0.15s ease, opacity 0.2s ease;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
+  outline: none;
+}
+button.yarl__navigation_prev {
+  left: 18px;
+}
+button.yarl__navigation_next {
+  right: 18px;
+}
+
+button.yarl__navigation_prev:hover,
+button.yarl__navigation_next:hover {
+  background: var(--viewer-control-hover);
+}
+button.yarl__navigation_prev:active {
+  transform: translateX(-2px);
+}
+button.yarl__navigation_next:active {
+  transform: translateX(2px);
+}
+
+button.yarl__navigation_prev:focus-visible,
+button.yarl__navigation_next:focus-visible {
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35);
+}
+
+button.yarl__navigation_prev svg,
+button.yarl__navigation_next svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+/* ===== Toolbar buttons ===== */
+.yarl__toolbar {
+  padding: 14px 18px;
+  gap: 8px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), transparent);
+}
+
+.yarl__toolbar button.yarl__button,
+.yarl__toolbar button.yarl__close {
+  background: var(--viewer-control-bg);
+  border: 1px solid var(--viewer-control-border);
+  color: #fff;
+  cursor: pointer;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  border-radius: 50%;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  transition: background 0.2s ease, transform 0.15s ease;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  outline: none;
+}
+
+.yarl__toolbar button.yarl__button:hover,
+.yarl__toolbar button.yarl__close:hover {
+  background: var(--viewer-control-hover);
+}
+.yarl__toolbar button.yarl__button:active,
+.yarl__toolbar button.yarl__close:active {
+  transform: scale(0.92);
+}
+
+.yarl__toolbar button.yarl__button:focus-visible,
+.yarl__toolbar button.yarl__close:focus-visible {
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35);
+}
+
+.yarl__toolbar button.yarl__button svg,
+.yarl__toolbar button.yarl__close svg {
+  fill: currentColor;
+}
+
+/* ===== Video element ===== */
+.yarl__slide_video {
+  background: transparent;
+}
+
+.yarl__slide_video video,
+.yarl__slide_video div[role="button"] video,
+video.yarl__fullsize {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: calc(100vh - 112px);
+  object-fit: contain;
+  border-radius: 10px;
+  background: #000;
+  box-shadow: 0 18px 56px rgba(0, 0, 0, 0.42);
+}
+
+/* ===== Container / backdrop polish ===== */
+.yarl__portal {
+  /* Prevent the page behind from scrolling on touch when zooming. */
+  overscroll-behavior: contain;
+}
+
+.yarl__container {
+  background: var(--yarl__color_backdrop);
+}
+
+.yarl__slide {
+  padding: 68px 18px 24px;
+}
+
+.yarl__slide_image {
+  border-radius: 10px;
+}
+
+/* Caption / description (file name) under media */
+.yarl__description {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+@media (max-width: 600px) {
+  button.yarl__navigation_prev,
+  button.yarl__navigation_next {
+    display: none;
+  }
+  .yarl__slide {
+    padding: 56px 4px;
+  }
+}

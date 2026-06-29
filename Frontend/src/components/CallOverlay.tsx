@@ -1,5 +1,6 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faDesktop,
   faMicrophone,
   faMicrophoneSlash,
   faPhone,
@@ -17,6 +18,7 @@ interface CallOverlayProps {
   callDuration: number;
   isMuted: boolean;
   isVideoEnabled: boolean;
+  isScreenSharing: boolean;
   callError: string | null;
   remoteAudioRef: React.RefObject<HTMLAudioElement | null>;
   remoteVideoRef: React.RefObject<HTMLVideoElement | null>;
@@ -26,6 +28,7 @@ interface CallOverlayProps {
   onEnd: () => void;
   onToggleMute: () => void;
   onToggleVideo: () => void;
+  onToggleScreenShare: () => void;
   onClearError: () => void;
 }
 
@@ -36,6 +39,7 @@ export function CallOverlay({
   callDuration,
   isMuted,
   isVideoEnabled,
+  isScreenSharing,
   callError,
   remoteAudioRef,
   remoteVideoRef,
@@ -45,6 +49,7 @@ export function CallOverlay({
   onEnd,
   onToggleMute,
   onToggleVideo,
+  onToggleScreenShare,
   onClearError,
 }: CallOverlayProps) {
   if (callState === "idle" && !callError) return null;
@@ -97,12 +102,15 @@ export function CallOverlay({
                   autoPlay
                   playsInline
                   muted
-                  className={`video-stream video-stream--local ${!isVideoEnabled ? "video-stream--hidden" : ""}`}
+                  className={`video-stream video-stream--local ${!isVideoEnabled && !isScreenSharing ? "video-stream--hidden" : ""} ${isScreenSharing ? "video-stream--screen" : ""}`}
                 />
-                {!isVideoEnabled && (
+                {!isVideoEnabled && !isScreenSharing && (
                   <div className="video-local-placeholder">
                     <span>Camera off</span>
                   </div>
+                )}
+                {isScreenSharing && (
+                  <div className="video-local-badge">Screen</div>
                 )}
               </div>
 
@@ -124,9 +132,19 @@ export function CallOverlay({
                     type="button"
                     className={`call-btn call-btn--video ${!isVideoEnabled ? "active" : ""}`}
                     onClick={onToggleVideo}
+                    disabled={isScreenSharing}
                     aria-label={isVideoEnabled ? "Turn off camera" : "Turn on camera"}
                   >
                     <FontAwesomeIcon icon={isVideoEnabled ? faVideo : faVideoSlash} />
+                  </button>
+                  <button
+                    type="button"
+                    className={`call-btn call-btn--screen ${isScreenSharing ? "active" : ""}`}
+                    onClick={onToggleScreenShare}
+                    aria-label={isScreenSharing ? "Stop screen sharing" : "Share screen"}
+                    title={isScreenSharing ? "Stop screen sharing" : "Share screen"}
+                  >
+                    <FontAwesomeIcon icon={faDesktop} />
                   </button>
                   <button
                     type="button"

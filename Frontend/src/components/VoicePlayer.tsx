@@ -62,6 +62,7 @@ export const VoicePlayer: React.FC<VoicePlayerProps> = ({ url, durationSec, isOw
 
   useEffect(() => {
     // Reset player states and clean up old audio if URL changes
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentTime(0);
     setDuration(durationSec || 0);
     setIsPlaying(false);

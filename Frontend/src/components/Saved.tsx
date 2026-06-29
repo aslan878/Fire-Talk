@@ -10,6 +10,8 @@ import {
   faTrash,
   faMicrophone,
   faArrowUpRightFromSquare,
+  faPlay,
+  faExpand,
 } from "@fortawesome/free-solid-svg-icons";
 import "./Saved.css";
 import { api, type SavedMessage } from "../services/api";
@@ -46,6 +48,16 @@ const getKindIcon = (kind: string) => {
   if (kind === "file") return faFile;
   if (kind === "voice") return faMicrophone;
   return faBookmark;
+};
+
+/** Format seconds as `m:ss` or `h:mm:ss` for video duration badges. */
+const formatVideoDuration = (secs: number): string => {
+  const total = Math.max(0, Math.floor(secs));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 };
 
 
@@ -96,8 +108,7 @@ const Saved = ({ onGoToMessage }: SavedProps) => {
     if (msg.kind === "image" && msg.attachment?.url) {
       return (
         <div
-          className="saved-media-preview"
-          style={{ cursor: "pointer" }}
+          className="saved-media-preview saved-media-preview--image"
           onClick={(e) => {
             e.stopPropagation();
             const idx = mediaSlides.findIndex(
@@ -106,10 +117,16 @@ const Saved = ({ onGoToMessage }: SavedProps) => {
             if (idx >= 0) onOpenMedia?.(idx);
           }}
         >
-          <img
-            src={msg.attachment.url}
-            alt={msg.attachment.fileName || "Image"}
-          />
+          <div className="message-attachment__media">
+            <img
+              src={msg.attachment.url}
+              alt={msg.attachment.fileName || "Image"}
+              loading="lazy"
+            />
+            <span className="message-attachment__expand" aria-hidden>
+              <FontAwesomeIcon icon={faExpand} />
+            </span>
+          </div>
         </div>
       );
     }
@@ -117,8 +134,7 @@ const Saved = ({ onGoToMessage }: SavedProps) => {
     if (msg.kind === "video" && msg.attachment?.url) {
       return (
         <div
-          className="saved-media-preview"
-          style={{ cursor: "pointer" }}
+          className="saved-media-preview saved-media-preview--video"
           onClick={(e) => {
             e.stopPropagation();
             const idx = mediaSlides.findIndex(
@@ -127,13 +143,32 @@ const Saved = ({ onGoToMessage }: SavedProps) => {
             if (idx >= 0) onOpenMedia?.(idx);
           }}
         >
-          <video
-            controls
-            onClick={(e) => e.stopPropagation()}
-            onError={(e) => console.error("Video load error:", (e.target as HTMLVideoElement).error)}
-          >
-            <source src={msg.attachment.url} type={msg.attachment.mimeType || "video/mp4"} />
-          </video>
+          <div className="message-attachment__media">
+            <video
+              muted
+              playsInline
+              preload="metadata"
+              src={msg.attachment.url}
+              onError={(e) =>
+                console.error(
+                  "Video load error:",
+                  (e.target as HTMLVideoElement).error,
+                )
+              }
+            />
+            <span className="message-attachment__play" aria-hidden>
+              <FontAwesomeIcon icon={faPlay} />
+            </span>
+            {typeof msg.attachment.durationSec === "number" &&
+              msg.attachment.durationSec > 0 && (
+                <span className="message-attachment__duration">
+                  {formatVideoDuration(msg.attachment.durationSec)}
+                </span>
+              )}
+            <span className="message-attachment__expand" aria-hidden>
+              <FontAwesomeIcon icon={faExpand} />
+            </span>
+          </div>
         </div>
       );
     }
@@ -164,8 +199,8 @@ const Saved = ({ onGoToMessage }: SavedProps) => {
       try {
         const response = await api.saved.getSavedMessages();
         if (!cancelled) setSavedItems(response.messages);
-      } catch (err: any) {
-        if (!cancelled) setError(err.message || "Failed to load saved messages");
+      } catch (err: unknown) {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load saved messages");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -183,9 +218,9 @@ const Saved = ({ onGoToMessage }: SavedProps) => {
     setSavedItems((items) => items.filter((saved) => saved._id !== item._id));
     try {
       await api.saved.deleteSavedMessage(item._id);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setSavedItems(previous);
-      setError(err.message || "Failed to remove saved message");
+      setError(err instanceof Error ? err.message : "Failed to remove saved message");
     }
   };
 

@@ -46,6 +46,8 @@ import {
   faPen,
   faReply,
   faTrashCan,
+  faPlay,
+  faExpand,
 } from "@fortawesome/free-solid-svg-icons";
 import { useSettings } from "../contexts/SettingsContext";
 import { useModal } from "./Modal";
@@ -110,6 +112,158 @@ interface MainChatProps {
   /** Edit an existing message (own text messages only). */
   onEditMessage?: (messageId: string, newText: string) => Promise<void>;
 }
+
+/** Format seconds as `m:ss` or `h:mm:ss` for video duration badges. */
+const formatVideoDuration = (secs: number): string => {
+  const total = Math.max(0, Math.floor(secs));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+};
+
+interface VideoAttachmentProps {
+  url: string;
+  fileName?: string | null;
+  durationSec?: number | null;
+  isPlaying: boolean;
+  onPlay: (video: HTMLVideoElement | null) => void;
+  onClose: () => void;
+  onExpand: (e: React.MouseEvent) => void;
+  caption?: React.ReactNode;
+}
+
+/**
+ * Video attachment that plays inline (in-chat) instead of opening the
+ * full-screen lightbox. Playback is started imperatively via `.play()`
+ * because toggling the `autoPlay` attribute is unreliable and is blocked
+ * on iOS/Safari/Capacitor unless invoked inside the user gesture.
+ */
+const VideoAttachment = ({
+  url,
+  fileName,
+  durationSec,
+  isPlaying,
+  onPlay,
+  onClose,
+  onExpand,
+  caption,
+}: VideoAttachmentProps) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoLabel = fileName ? `Воспроизвести ${fileName}` : "Воспроизвести";
+  const openFullscreen = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const fullscreenVideo = video as HTMLVideoElement & {
+      webkitRequestFullscreen?: () => Promise<void> | void;
+    };
+    const requestFullscreen =
+      fullscreenVideo.requestFullscreen?.bind(fullscreenVideo) ||
+      fullscreenVideo.webkitRequestFullscreen?.bind(fullscreenVideo);
+    const result = requestFullscreen?.();
+    if (result instanceof Promise) {
+      result.catch(() => {});
+    }
+  };
+
+  // Start playback as soon as we switch into the "playing" state.
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!isPlaying || !el) return;
+    // `play()` returns a promise that may reject if interrupted (e.g. the
+    // user closes before playback begins) — swallow that.
+    el.play().catch(() => {});
+  }, [isPlaying]);
+
+  return (
+    <div
+      className={`message-attachment message-attachment--video${
+        isPlaying ? " message-attachment--playing" : ""
+      }`}
+    >
+      <div className="message-attachment__media">
+        <video
+          ref={videoRef}
+          muted={!isPlaying}
+          playsInline
+          controls={isPlaying}
+          controlsList="nodownload noplaybackrate noremoteplayback"
+          disablePictureInPicture
+          disableRemotePlayback
+          preload="metadata"
+          src={url}
+          title={fileName || undefined}
+          onClick={isPlaying ? undefined : (e) => e.stopPropagation()}
+          onError={(e) =>
+            console.error(
+              "Video load error:",
+              (e.currentTarget as HTMLVideoElement).error?.message || e.type,
+            )
+          }
+        />
+
+        {!isPlaying && (
+          <>
+            <button
+              type="button"
+              className="message-attachment__play"
+              aria-label={videoLabel}
+              onClick={(e) => {
+                e.stopPropagation();
+                onPlay(videoRef.current);
+              }}
+            >
+              <FontAwesomeIcon icon={faPlay} />
+            </button>
+            {typeof durationSec === "number" && durationSec > 0 && (
+              <span className="message-attachment__duration">
+                {formatVideoDuration(durationSec)}
+              </span>
+            )}
+            <span
+              className="message-attachment__expand"
+              aria-hidden
+              onClick={onExpand}
+            >
+              <FontAwesomeIcon icon={faExpand} />
+            </span>
+          </>
+        )}
+
+        {isPlaying && (
+          <>
+            <button
+              type="button"
+              className="message-attachment__fullscreen"
+              aria-label="На весь экран"
+              onClick={(e) => {
+                e.stopPropagation();
+                openFullscreen();
+              }}
+            >
+              <FontAwesomeIcon icon={faExpand} />
+            </button>
+            <button
+              type="button"
+              className="message-attachment__close"
+              aria-label="Закрыть"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+            >
+              <FontAwesomeIcon icon={faXmark} />
+            </button>
+          </>
+        )}
+      </div>
+
+      {caption && <p className="message-attachment__caption">{caption}</p>}
+    </div>
+  );
+};
+
 
 export const MainChat: React.FC<MainChatProps> = ({
   activeChat,
@@ -232,6 +386,9 @@ export const MainChat: React.FC<MainChatProps> = ({
   // Media viewer (lightbox)
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  // id of the message whose video is currently playing inline (in-chat preview),
+  // as opposed to opening the full-screen lightbox.
+  const [inlineVideoId, setInlineVideoId] = useState<string | null>(null);
   const mediaSlides = useMemo<MediaSlide[]>(
     () =>
       messages
@@ -971,7 +1128,7 @@ export const MainChat: React.FC<MainChatProps> = ({
       );
     }
 
-    if ((msg.kind === "image" || msg.kind === "video") && msg.attachment?.url) {
+    if (msg.kind === "image" && msg.attachment?.url) {
       const mediaIdx = mediaSlides.findIndex(
         (s) => s.src === msg.attachment!.url,
       );
@@ -984,26 +1141,57 @@ export const MainChat: React.FC<MainChatProps> = ({
       };
       return (
         <div
-          className="message-attachment"
-          style={{ cursor: "pointer" }}
+          className="message-attachment message-attachment--image"
           onClick={openViewer}
         >
-          {msg.kind === "image" ? (
+          <div className="message-attachment__media">
             <img
               src={msg.attachment.url}
               alt={msg.attachment.fileName || "Attachment"}
+              loading="lazy"
             />
-          ) : (
-            <video controls onError={(e) => console.error("Video load error:", (e.target as HTMLVideoElement).error)}>
-              <source src={msg.attachment.url} type={msg.attachment.mimeType || "video/mp4"} />
-            </video>
-          )}
+            <span className="message-attachment__expand" aria-hidden>
+              <FontAwesomeIcon icon={faExpand} />
+            </span>
+          </div>
           {msg.text && (
-            <p>
+            <p className="message-attachment__caption">
               <HighlightText text={msg.text} query={highlightQuery} />
             </p>
           )}
         </div>
+      );
+    }
+
+    if (msg.kind === "video" && msg.attachment?.url) {
+      const mediaIdx = mediaSlides.findIndex(
+        (s) => s.src === msg.attachment!.url,
+      );
+      const openViewer = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (mediaIdx >= 0) {
+          setLightboxIndex(mediaIdx);
+          setLightboxOpen(true);
+        }
+      };
+      return (
+        <VideoAttachment
+          url={msg.attachment.url}
+          fileName={msg.attachment.fileName}
+          durationSec={msg.attachment.durationSec}
+          isPlaying={inlineVideoId === msg.id}
+          onPlay={(video) => {
+            setInlineVideoId(msg.id);
+            video?.play().catch(() => {});
+          }}
+          onClose={() => setInlineVideoId(null)}
+          onExpand={openViewer}
+          caption={
+            msg.text ? (
+              <HighlightText text={msg.text} query={highlightQuery} />
+            ) : undefined
+          }
+        />
       );
     }
 

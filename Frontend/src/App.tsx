@@ -110,6 +110,40 @@ const formatChatMessage = (msg: any, currentUserId: string) => ({
 });
 
 const CACHE_DEBOUNCE_MS = 400;
+const MAX_CACHE_TEXT_LENGTH = 300;
+const MAX_CACHE_SIZE_BYTES = 3.5 * 1024 * 1024;
+
+const sanitizeForCache = (formattedMsgs: any[], chatUsers: Record<string, any>) => {
+  const sanitized = formattedMsgs.map((msg: any) => {
+    const safe: any = {
+      id: msg.id,
+      userId: msg.userId,
+      text: msg.text ? msg.text.slice(0, MAX_CACHE_TEXT_LENGTH) : msg.text,
+      kind: msg.kind,
+      timestamp: msg.timestamp,
+      isOwn: msg.isOwn,
+      createdAt: msg.createdAt,
+    };
+    if (msg.attachment) {
+      safe.attachment = {
+        url: msg.attachment.url,
+        fileName: msg.attachment.fileName,
+        mimeType: msg.attachment.mimeType,
+      };
+    }
+    if (msg.poll) {
+      safe.poll = msg.poll;
+    }
+    if (msg.todo) {
+      safe.todo = { title: msg.todo.title, done: msg.todo.done };
+    }
+    if (msg.reactions) {
+      safe.reactions = msg.reactions;
+    }
+    return safe;
+  });
+  return { formattedMsgs: sanitized, chatUsers };
+};
 
 const getMessagePreview = (message: {
   text?: string;
@@ -234,7 +268,7 @@ const tryVibrate = (pattern: number | number[]) => {
     if ("vibrate" in navigator) {
       navigator.vibrate(pattern);
     }
-  } catch (e) {
+  } catch {
     // silently ignore
   }
 };
@@ -387,6 +421,18 @@ function MainLayout({
 }
 
 const safeSetLocalStorage = (key: string, value: string) => {
+  // Pre-check: if serialized value is too large, truncate before attempting write
+  if (value.length > MAX_CACHE_SIZE_BYTES) {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && Array.isArray(parsed.formattedMsgs)) {
+        const maxMsgs = Math.max(10, Math.floor(parsed.formattedMsgs.length * (MAX_CACHE_SIZE_BYTES / value.length)));
+        parsed.formattedMsgs = parsed.formattedMsgs.slice(-Math.min(maxMsgs, 30));
+        value = JSON.stringify(parsed);
+      }
+    } catch { /* ignore parse errors */ }
+  }
+
   try {
     localStorage.setItem(key, value);
   } catch (e: any) {
@@ -420,15 +466,15 @@ const safeSetLocalStorage = (key: string, value: string) => {
         );
       }
 
-      // If still fails, try parsing and truncating the message list to last 15 messages
+      // If still fails, try parsing and truncating the message list to last 10 messages
       try {
         const parsed = JSON.parse(value);
         if (
           parsed &&
           Array.isArray(parsed.formattedMsgs) &&
-          parsed.formattedMsgs.length > 15
+          parsed.formattedMsgs.length > 10
         ) {
-          parsed.formattedMsgs = parsed.formattedMsgs.slice(-15);
+          parsed.formattedMsgs = parsed.formattedMsgs.slice(-10);
           localStorage.setItem(key, JSON.stringify(parsed));
           return;
         }
@@ -544,7 +590,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [currentUserData]);
+  }, [currentUserData, updateLocalSettings]);
 
   // Request browser notification permission on login
   useEffect(() => {
@@ -583,7 +629,6 @@ function App() {
   }, [settings]);
 
   const socketRef = useRef<any>(null);
-  const [socketInstance, setSocketInstance] = useState<any>(null);
   const cacheWriteTimersRef = useRef<
     Map<string, ReturnType<typeof setTimeout>>
   >(new Map());
@@ -597,9 +642,10 @@ function App() {
       timers.set(
         chatId,
         setTimeout(() => {
+          const sanitized = sanitizeForCache(formattedMsgs, chatUsers);
           safeSetLocalStorage(
             `chat_cache_${chatId}`,
-            JSON.stringify({ formattedMsgs, chatUsers }),
+            JSON.stringify(sanitized),
           );
           timers.delete(chatId);
         }, CACHE_DEBOUNCE_MS),
@@ -627,7 +673,6 @@ function App() {
     });
 
     socketRef.current = socket;
-    setSocketInstance(socket);
 
     const typingTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -1022,18 +1067,17 @@ function App() {
     return () => {
       socket.disconnect();
       socketRef.current = null;
-      setSocketInstance(null);
     };
   }, [currentUserData, scheduleChatCacheWrite]);
 
   // Synchronise online status preference with server on startup or preference change
   useEffect(() => {
-    if (socketInstance && settings.onlineStatus !== undefined) {
-      socketInstance.emit("set_online_status_preference", {
+    if (socketRef.current && settings.onlineStatus !== undefined) {
+      socketRef.current.emit("set_online_status_preference", {
         onlineStatus: settings.onlineStatus !== false,
       });
     }
-  }, [socketInstance, settings.onlineStatus]);
+  }, [settings.onlineStatus]);
 
   const {
     callState,
@@ -1042,6 +1086,7 @@ function App() {
     isInCall,
     isMuted,
     isVideoEnabled,
+    isScreenSharing,
     callDuration,
     callError,
     remoteAudioRef,
@@ -1053,8 +1098,9 @@ function App() {
     endCall,
     toggleMute,
     toggleVideo,
+    toggleScreenShare,
     clearError,
-  } = useCall(socketInstance, currentUserData?.id ?? "");
+  } = useCall(socketRef, currentUserData?.id ?? "");
 
   const handleStartCall = useCallback(
     (type: "audio" | "video") => {
@@ -1079,13 +1125,9 @@ function App() {
   }, [activeChat]);
 
   const loadChats = useCallback(
-    async (selectChatId?: string, silent = false) => {
+    async (selectChatId?: string) => {
       if (!currentUserData) return;
       try {
-        if (!silent) {
-          setChatsLoading(true);
-        }
-        // Single request instead of 3 separate ones
         const { conversations, groups, channels } =
           await api.chats.getAllChats();
 
@@ -1161,7 +1203,9 @@ function App() {
 
         setChats((prevChats) => {
           return formattedChats.map((newChat) => {
-            const prevChat = prevChats.find((pc) => pc.id === newChat.id);
+            const prevChat = Array.isArray(prevChats)
+              ? prevChats.find((pc) => pc.id === newChat.id)
+              : undefined;
             const unreadCount = prevChat ? prevChat.unreadCount || 0 : 0;
             return {
               ...newChat,
@@ -1181,9 +1225,10 @@ function App() {
         ) {
           setActiveChat(formattedChats[0]);
         }
+        setChatsLoading(false);
       } catch (err) {
         console.error("Failed to load chats:", err);
-      } finally {
+        setChats([]);
         setChatsLoading(false);
       }
     },
@@ -1193,10 +1238,6 @@ function App() {
   useEffect(() => {
     if (currentUserData) {
       loadChats();
-    } else {
-      setChats([]);
-      setActiveChat(null);
-      setMessages([]);
     }
   }, [currentUserData, loadChats]);
 
@@ -1216,7 +1257,7 @@ function App() {
           setActiveChat(found);
         } else {
           // Chat not loaded yet — trigger a reload and select it when done
-          void loadChats(chatId, true);
+          void loadChats(chatId);
         }
         return prev;
       });
@@ -1235,7 +1276,9 @@ function App() {
   useEffect(() => {
     if (!activeChatId || !currentUserData) {
       messagesLoadedForChatRef.current = null;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMessages([]);
+       
       setMessagesLoading(false);
       return;
     }
@@ -1256,10 +1299,12 @@ function App() {
       try {
         const { formattedMsgs, chatUsers } = JSON.parse(cachedData);
         if (Array.isArray(formattedMsgs)) {
+           
           setMessages(formattedMsgs);
           if (chatUsers) {
             setUsersMap((prev) => ({ ...prev, ...chatUsers }));
           }
+           
           setMessagesLoading(false);
           hasCache = true;
         }
@@ -1270,7 +1315,9 @@ function App() {
 
     if (!hasCache) {
       // Clear immediately so old messages never flash
+       
       setMessages([]);
+       
       setMessagesLoading(true);
     }
 
@@ -1343,21 +1390,21 @@ function App() {
   const typingUsernames = Object.values(typingUsers[activeChat?.id] || {});
 
   const handleTyping = useCallback(() => {
-    if (socketInstance && activeChat?.id) {
-      socketInstance.emit("typing", {
+    if (socketRef.current && activeChat?.id) {
+      socketRef.current.emit("typing", {
         chatId: activeChat.id,
         username: currentUserData?.name || "Someone",
       });
     }
-  }, [socketInstance, activeChat?.id, currentUserData]);
+  }, [activeChat, currentUserData]);
 
   const handleStopTyping = useCallback(() => {
-    if (socketInstance && activeChat?.id) {
-      socketInstance.emit("stop_typing", {
+    if (socketRef.current && activeChat?.id) {
+      socketRef.current.emit("stop_typing", {
         chatId: activeChat.id,
       });
     }
-  }, [socketInstance, activeChat?.id]);
+  }, [activeChat]);
 
   const handleSendMessage = (payload: SendMessagePayload) => {
     if (!activeChat || !currentUserData) return;
@@ -1637,6 +1684,7 @@ function App() {
           callDuration={callDuration}
           isMuted={isMuted}
           isVideoEnabled={isVideoEnabled}
+          isScreenSharing={isScreenSharing}
           callError={callError}
           remoteAudioRef={remoteAudioRef}
           remoteVideoRef={remoteVideoRef}
@@ -1646,6 +1694,7 @@ function App() {
           onEnd={endCall}
           onToggleMute={toggleMute}
           onToggleVideo={toggleVideo}
+          onToggleScreenShare={toggleScreenShare}
           onClearError={clearError}
         />
       )}
@@ -1725,7 +1774,7 @@ function App() {
                     onLogout={handleLogout}
                     onSelectChat={handleSelectChat}
                     onTabChange={(tabId) => setActiveTab(tabId)}
-                    onChatCreated={(chatId) => loadChats(chatId, true)}
+                    onChatCreated={(chatId) => loadChats(chatId)}
                   />
                 </MainLayout>
               ) : (
@@ -1872,7 +1921,7 @@ function App() {
             element={
               <GroupInviteRoute
                 currentUserData={currentUserData}
-                onJoined={(chatId) => loadChats(chatId, true)}
+                onJoined={(chatId) => loadChats(chatId)}
               />
             }
           />

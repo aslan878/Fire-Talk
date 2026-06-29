@@ -19,7 +19,7 @@ function createCallId(userA: string, userB: string) {
 }
 
 export function useCall(
-  socket: Socket | null,
+  socketRef: React.MutableRefObject<Socket | null>,
   currentUserId: string,
 ) {
   const [callState, setCallState] = useState<CallState>("idle");
@@ -27,6 +27,7 @@ export function useCall(
   const [callType, setCallType] = useState<CallType>("audio");
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [callError, setCallError] = useState<string | null>(null);
 
@@ -38,6 +39,8 @@ export function useCall(
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
+  const cameraVideoTrackRef = useRef<MediaStreamTrack | null>(null);
   const callIdRef = useRef<string | null>(null);
   const peerRef = useRef<CallPeer | null>(null);
   const callStateRef = useRef<CallState>("idle");
@@ -74,10 +77,21 @@ export function useCall(
 
   const cleanup = useCallback(() => {
     stopDurationTimer();
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach((t) => t.stop());
+      screenStreamRef.current = null;
+    }
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
     }
+    if (
+      cameraVideoTrackRef.current &&
+      cameraVideoTrackRef.current.readyState !== "ended"
+    ) {
+      cameraVideoTrackRef.current.stop();
+    }
+    cameraVideoTrackRef.current = null;
     setLocalStream(null);
     setRemoteStream(null);
 
@@ -98,6 +112,7 @@ export function useCall(
     isInitiatorRef.current = false;
     setIsMuted(false);
     setIsVideoEnabled(true);
+    setIsScreenSharing(false);
     setCallDuration(0);
     setCallError(null);
   }, [stopDurationTimer]);
@@ -114,6 +129,7 @@ export function useCall(
       video: type === "video",
     });
     localStreamRef.current = stream;
+    cameraVideoTrackRef.current = stream.getVideoTracks()[0] ?? null;
     setLocalStream(stream);
     return stream;
   }, []);
@@ -124,8 +140,8 @@ export function useCall(
       pcRef.current = pc;
 
       pc.onicecandidate = (event) => {
-        if (event.candidate && socket) {
-          socket.emit("webrtc:ice-candidate", {
+        if (event.candidate) {
+          socketRef.current?.emit("webrtc:ice-candidate", {
             callId,
             toUserId: remoteUserId,
             candidate: event.candidate.toJSON(),
@@ -150,7 +166,7 @@ export function useCall(
 
       return pc;
     },
-    [socket],
+    [],
   );
 
   const addLocalTracks = useCallback(
@@ -163,32 +179,32 @@ export function useCall(
   const endCall = useCallback(() => {
     const currentPeer = peerRef.current;
     const callId = callIdRef.current;
-    if (socket && currentPeer && callId) {
-      socket.emit("call:end", {
+    if (currentPeer && callId) {
+      socketRef.current?.emit("call:end", {
         callId,
         toUserId: currentPeer.userId,
       });
     }
     resetCall();
-  }, [socket, resetCall]);
+  }, [resetCall]);
 
   const rejectCall = useCallback(() => {
     const currentPeer = peerRef.current;
     const callId = callIdRef.current;
-    if (socket && currentPeer && callId) {
-      socket.emit("call:reject", {
+    if (currentPeer && callId) {
+      socketRef.current?.emit("call:reject", {
         callId,
         toUserId: currentPeer.userId,
       });
     }
     resetCall();
-  }, [socket, resetCall]);
+  }, [resetCall]);
 
   const acceptCall = useCallback(async () => {
     const currentPeer = peerRef.current;
     const callId = callIdRef.current;
     const currentCallType = callTypeRef.current;
-    if (!socket || !currentPeer || !callId) return;
+    if (!socketRef.current || !currentPeer || !callId) return;
 
     try {
       const stream = await getLocalStream(currentCallType);
@@ -196,7 +212,7 @@ export function useCall(
       addLocalTracks(pc, stream);
       setCallState("connecting");
 
-      socket.emit("call:accept", {
+      socketRef.current.emit("call:accept", {
         callId,
         toUserId: currentPeer.userId,
       });
@@ -210,7 +226,6 @@ export function useCall(
       rejectCall();
     }
   }, [
-    socket,
     getLocalStream,
     createPeerConnection,
     addLocalTracks,
@@ -219,7 +234,7 @@ export function useCall(
 
   const startCall = useCallback(
     async (targetUserId: string, targetName: string, chatId: string, type: CallType) => {
-      if (!socket || callStateRef.current !== "idle") return;
+      if (!socketRef.current || callStateRef.current !== "idle") return;
 
       const callId = createCallId(currentUserId, targetUserId);
       callIdRef.current = callId;
@@ -234,7 +249,7 @@ export function useCall(
       setPeer(callPeer);
       setCallState("outgoing");
 
-      socket.emit("call:invite", {
+      socketRef.current.emit("call:invite", {
         callId,
         toUserId: targetUserId,
         fromUserName:
@@ -243,7 +258,7 @@ export function useCall(
         callType: type,
       });
     },
-    [socket, currentUserId],
+    [currentUserId],
   );
 
   const createAndSendOffer = useCallback(
@@ -257,7 +272,7 @@ export function useCall(
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
-        socket?.emit("webrtc:offer", {
+        socketRef.current?.emit("webrtc:offer", {
           callId,
           toUserId: remoteUserId,
           offer,
@@ -272,7 +287,7 @@ export function useCall(
         endCall();
       }
     },
-    [socket, getLocalStream, createPeerConnection, addLocalTracks, endCall],
+    [getLocalStream, createPeerConnection, addLocalTracks, endCall],
   );
 
   const handleRemoteAnswer = useCallback(
@@ -296,8 +311,8 @@ export function useCall(
 
       const currentPeer = peerRef.current;
       const callId = callIdRef.current;
-      if (socket && currentPeer && callId) {
-        socket.emit("webrtc:answer", {
+      if (currentPeer && callId) {
+        socketRef.current?.emit("webrtc:answer", {
           callId,
           toUserId: currentPeer.userId,
           answer,
@@ -306,7 +321,7 @@ export function useCall(
       setCallState("connected");
       startDurationTimer();
     },
-    [socket, startDurationTimer],
+    [startDurationTimer],
   );
 
   const toggleMute = useCallback(() => {
@@ -317,11 +332,104 @@ export function useCall(
   }, []);
 
   const toggleVideo = useCallback(() => {
+    if (isScreenSharing) return;
     const videoTrack = localStreamRef.current?.getVideoTracks()[0];
     if (!videoTrack) return;
     videoTrack.enabled = !videoTrack.enabled;
     setIsVideoEnabled(videoTrack.enabled);
+  }, [isScreenSharing]);
+
+  const replaceOutgoingVideoTrack = useCallback(async (track: MediaStreamTrack) => {
+    const sender = pcRef.current
+      ?.getSenders()
+      .find((s) => s.track?.kind === "video");
+    if (!sender) {
+      throw new Error("Video sender is not available");
+    }
+    await sender.replaceTrack(track);
   }, []);
+
+  const setLocalPreviewVideoTrack = useCallback((track: MediaStreamTrack) => {
+    const stream = localStreamRef.current;
+    if (!stream) return;
+
+    stream.getVideoTracks().forEach((videoTrack) => {
+      stream.removeTrack(videoTrack);
+    });
+    stream.addTrack(track);
+    setLocalStream(new MediaStream(stream.getTracks()));
+  }, []);
+
+  const stopScreenShare = useCallback(async () => {
+    const screenStream = screenStreamRef.current;
+    if (!screenStream) return;
+
+    screenStreamRef.current = null;
+    screenStream.getTracks().forEach((track) => {
+      track.onended = null;
+      track.stop();
+    });
+
+    const cameraTrack = cameraVideoTrackRef.current;
+    if (cameraTrack && cameraTrack.readyState !== "ended") {
+      try {
+        await replaceOutgoingVideoTrack(cameraTrack);
+        setLocalPreviewVideoTrack(cameraTrack);
+        setIsVideoEnabled(cameraTrack.enabled);
+      } catch (e) {
+        console.error("stopScreenShare restore error:", e);
+        setCallError("Failed to switch back to camera");
+      }
+    }
+
+    setIsScreenSharing(false);
+  }, [replaceOutgoingVideoTrack, setLocalPreviewVideoTrack]);
+
+  const startScreenShare = useCallback(async () => {
+    if (callTypeRef.current !== "video" || callStateRef.current !== "connected") {
+      return;
+    }
+    if (!navigator.mediaDevices.getDisplayMedia) {
+      setCallError("Screen sharing is not supported in this browser");
+      return;
+    }
+
+    try {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: false,
+      });
+      const screenTrack = screenStream.getVideoTracks()[0];
+      if (!screenTrack) {
+        throw new Error("No screen video track selected");
+      }
+
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
+      await replaceOutgoingVideoTrack(screenTrack);
+      screenStreamRef.current = screenStream;
+      setLocalPreviewVideoTrack(screenTrack);
+      setIsScreenSharing(true);
+
+      screenTrack.onended = () => {
+        void stopScreenShare();
+      };
+    } catch (e) {
+      const errorName = e instanceof DOMException ? e.name : "";
+      if (errorName === "NotAllowedError" || errorName === "AbortError") return;
+      console.error("startScreenShare error:", e);
+      setCallError("Failed to start screen sharing");
+    }
+  }, [replaceOutgoingVideoTrack, setLocalPreviewVideoTrack, stopScreenShare]);
+
+  const toggleScreenShare = useCallback(() => {
+    if (screenStreamRef.current) {
+      void stopScreenShare();
+      return;
+    }
+    void startScreenShare();
+  }, [startScreenShare, stopScreenShare]);
 
   // Bind streams to video / audio elements when they are mounted and streams change.
   // callState is included as a dependency so these re-run when callState becomes
@@ -344,6 +452,7 @@ export function useCall(
   }, [remoteStream, callType, callState]);
 
   useEffect(() => {
+    const socket = socketRef.current;
     if (!socket) return;
 
     const onInvite = (payload: {
@@ -444,7 +553,6 @@ export function useCall(
       socket.off("webrtc:ice-candidate", onIceCandidate);
     };
   }, [
-    socket,
     createAndSendOffer,
     resetCall,
     handleRemoteOffer,
@@ -462,6 +570,7 @@ export function useCall(
     isInCall,
     isMuted,
     isVideoEnabled,
+    isScreenSharing,
     callDuration,
     callError,
     remoteAudioRef,
@@ -473,6 +582,7 @@ export function useCall(
     endCall,
     toggleMute,
     toggleVideo,
+    toggleScreenShare,
     clearError: () => setCallError(null),
   };
 }

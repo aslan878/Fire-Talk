@@ -74,9 +74,9 @@ const Settings = () => {
       try {
         const data = await api.settings.getSettings();
         if (!cancelled) setSettings({ ...defaultSettings, ...data });
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!cookieSettings && !cancelled) {
-          setError(err.message || "Failed to load settings");
+          setError(err instanceof Error ? err.message : "Failed to load settings");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -113,10 +113,10 @@ const Settings = () => {
       const merged = { ...defaultSettings, ...response.settings };
       setSettings(merged);
       updateLocalSettings(merged);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setSettings(previous);
       updateLocalSettings(previous);
-      setError(err.message || "Failed to save settings");
+      setError(err instanceof Error ? err.message : "Failed to save settings");
     } finally {
       setSaving(false);
     }

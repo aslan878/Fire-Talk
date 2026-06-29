@@ -167,20 +167,19 @@
   border-radius: 8px;
   overflow: hidden;
   max-width: 100%;
+  cursor: pointer;
 }
 
-.saved-media-preview img,
-.saved-media-preview video {
-  display: block;
-  max-width: 100%;
-  max-height: 180px;
-  border-radius: 8px;
-  object-fit: contain;
-  background: rgba(0, 0, 0, 0.18);
+/* Image / video previews share the message-attachment media wrapper,
+   so only constrain the size here; visuals are handled in App.css. */
+.saved-media-preview--image,
+.saved-media-preview--video {
+  max-width: min(280px, 60vw);
 }
 
-.saved-media-preview video {
-  width: 100%;
+.saved-media-preview .message-attachment__media img,
+.saved-media-preview .message-attachment__media video {
+  max-height: 200px;
 }
 
 /* Voice player inside saved items */
